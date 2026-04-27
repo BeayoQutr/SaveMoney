@@ -154,6 +154,22 @@ export default function Home() {
     }
   }
 
+  async function fillTodayExpense() {
+    const today = new Date().toISOString().split("T")[0];
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/expenses/summary/daily?query_date=${today}`
+      );
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+      const data: DailySummary = await response.json();
+      setActualExpenseToday(String(data.total_amount));
+    } catch {
+      setAdjustError("自动读取今日消费失败");
+    }
+  }
+
   async function querySummary() {
     setSummaryError("");
     setSummaryResult(null);
@@ -337,6 +353,13 @@ export default function Home() {
             placeholder="例如 50"
           />
         </label>
+
+        <button
+          onClick={fillTodayExpense}
+          className="rounded-lg border px-3 py-2 text-sm text-gray-400 hover:text-white"
+        >
+          自动填入今日消费
+        </button>
 
         <button
           onClick={adjustPlan}
