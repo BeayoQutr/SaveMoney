@@ -141,6 +141,7 @@ export default function Home() {
   const [expenseError, setExpenseError] = useState("");
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>([]);
   const [expenseListError, setExpenseListError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   const [summaryDate, setSummaryDate] = useState("");
   const [summaryResult, setSummaryResult] = useState<DailySummary | null>(null);
@@ -353,6 +354,25 @@ export default function Home() {
       fetchMonthlySummary();
     } catch {
       setExpenseError("记录失败，请确认后端已启动");
+    }
+  }
+
+  async function deleteExpense(id: number) {
+    setDeleteError("");
+    const ok = window.confirm("确定删除这条消费记录吗？");
+    if (!ok) return;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/expenses/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("删除失败");
+      }
+      fetchExpenses();
+      fetchMonthlySummary();
+    } catch {
+      setDeleteError("删除失败，请确认后端已启动或记录是否仍然存在");
     }
   }
 
@@ -780,6 +800,10 @@ export default function Home() {
         <p className="mt-4 text-red-600 font-medium">{expenseListError}</p>
       )}
 
+      {deleteError && (
+        <p className="mt-4 text-red-600 font-medium">{deleteError}</p>
+      )}
+
       {expenseList.length > 0 && (
         <section className="mt-4 max-w-md flex flex-col gap-3">
           {expenseList.map((item) => (
@@ -803,6 +827,12 @@ export default function Home() {
                 <span className="text-gray-400">分类：</span>
                 {item.category}
               </p>
+              <button
+                onClick={() => deleteExpense(item.id)}
+                className="mt-2 rounded-lg border border-red-800 px-3 py-1 text-sm text-red-500 hover:bg-red-950"
+              >
+                删除
+              </button>
             </div>
           ))}
         </section>
