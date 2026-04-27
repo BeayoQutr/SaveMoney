@@ -142,6 +142,11 @@ export default function Home() {
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>([]);
   const [expenseListError, setExpenseListError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editError, setEditError] = useState("");
 
   const [summaryDate, setSummaryDate] = useState("");
   const [summaryResult, setSummaryResult] = useState<DailySummary | null>(null);
@@ -373,6 +378,43 @@ export default function Home() {
       fetchMonthlySummary();
     } catch {
       setDeleteError("删除失败，请确认后端已启动或记录是否仍然存在");
+    }
+  }
+
+  async function saveEdit(id: number) {
+    setEditError("");
+
+    if (!editAmount || isNaN(Number(editAmount))) {
+      setEditError("请输入有效的消费金额");
+      return;
+    }
+    if (editNote.trim() === "") {
+      setEditError("请输入消费备注");
+      return;
+    }
+    if (!editDate) {
+      setEditError("请选择消费日期");
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/expenses/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Number(editAmount),
+          note: editNote,
+          date: editDate,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("更新失败");
+      }
+      setEditingId(null);
+      fetchExpenses();
+      fetchMonthlySummary();
+    } catch {
+      setEditError("更新失败，请确认后端已启动或记录是否仍然存在");
     }
   }
 
@@ -804,6 +846,10 @@ export default function Home() {
         <p className="mt-4 text-red-600 font-medium">{deleteError}</p>
       )}
 
+      {editError && (
+        <p className="mt-4 text-red-600 font-medium">{editError}</p>
+      )}
+
       {expenseList.length > 0 && (
         <section className="mt-4 max-w-md flex flex-col gap-3">
           {expenseList.map((item) => (
@@ -811,28 +857,95 @@ export default function Home() {
               key={item.id}
               className="rounded-xl border border-gray-700 p-3"
             >
-              <p>
-                <span className="text-gray-400">金额：</span>
-                {item.amount} 元
-              </p>
-              <p>
-                <span className="text-gray-400">备注：</span>
-                {item.note}
-              </p>
-              <p>
-                <span className="text-gray-400">日期：</span>
-                {item.date}
-              </p>
-              <p>
-                <span className="text-gray-400">分类：</span>
-                {item.category}
-              </p>
-              <button
-                onClick={() => deleteExpense(item.id)}
-                className="mt-2 rounded-lg border border-red-800 px-3 py-1 text-sm text-red-500 hover:bg-red-950"
-              >
-                删除
-              </button>
+              {editingId === item.id ? (
+                <>
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    金额
+                    <input
+                      type="number"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      className="rounded-lg border px-3 py-2"
+                      placeholder="例如 35"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-medium mt-2">
+                    备注
+                    <input
+                      type="text"
+                      value={editNote}
+                      onChange={(e) => setEditNote(e.target.value)}
+                      className="rounded-lg border px-3 py-2"
+                      placeholder="例如 午餐"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-medium mt-2">
+                    日期
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="rounded-lg border px-3 py-2"
+                    />
+                  </label>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => saveEdit(item.id)}
+                      className="rounded-lg bg-black px-3 py-1 text-sm text-white"
+                    >
+                      保存
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditError("");
+                      }}
+                      className="rounded-lg border border-gray-600 px-3 py-1 text-sm text-gray-400 hover:text-white"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>
+                    <span className="text-gray-400">金额：</span>
+                    {item.amount} 元
+                  </p>
+                  <p>
+                    <span className="text-gray-400">备注：</span>
+                    {item.note}
+                  </p>
+                  <p>
+                    <span className="text-gray-400">日期：</span>
+                    {item.date}
+                  </p>
+                  <p>
+                    <span className="text-gray-400">分类：</span>
+                    {item.category}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => {
+                        setEditingId(item.id);
+                        setEditAmount(String(item.amount));
+                        setEditNote(item.note);
+                        setEditDate(item.date);
+                        setEditError("");
+                      }}
+                      className="rounded-lg border border-gray-600 px-3 py-1 text-sm text-gray-400 hover:text-white"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      onClick={() => deleteExpense(item.id)}
+                      className="rounded-lg border border-red-800 px-3 py-1 text-sm text-red-500 hover:bg-red-950"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </section>
