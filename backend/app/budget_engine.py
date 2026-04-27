@@ -1,6 +1,7 @@
 from datetime import date
 
 from app.schemas import GeneratePlanRequest, GeneratePlanResponse
+from app.schemas import AdjustPlanRequest, AdjustPlanResponse
 
 
 def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
@@ -85,4 +86,30 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
         safe_saving_capacity=round(safe_saving_capacity, 2),
         status=status,
         message=message
+    )
+
+
+def adjust_saving_plan(data: AdjustPlanRequest) -> AdjustPlanResponse:
+    remaining_amount = round(data.target_amount - data.saved_amount, 2)
+    actual_saving_today = max(data.daily_available - data.actual_expense_today, 0)
+    actual_saving_today = round(actual_saving_today, 2)
+    today_gap = round(data.planned_daily_saving - actual_saving_today, 2)
+    adjusted_remaining_amount = round(remaining_amount + today_gap, 2)
+    new_daily_saving = round(adjusted_remaining_amount / data.remaining_days, 2)
+    adjustment_per_day = round(new_daily_saving - data.planned_daily_saving, 2)
+
+    if new_daily_saving <= data.daily_available:
+        status = "ok"
+        message = "计划已调整，后续每日存钱压力仍在可承受范围内"
+    else:
+        status = "hard"
+        message = "计划已调整，但后续每日存钱压力较大，建议降低目标或延长期限"
+
+    return AdjustPlanResponse(
+        remaining_amount=remaining_amount,
+        today_gap=today_gap,
+        new_daily_saving=new_daily_saving,
+        adjustment_per_day=adjustment_per_day,
+        status=status,
+        message=message,
     )

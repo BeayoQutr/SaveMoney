@@ -51,3 +51,21 @@ class DailyExpenseSummaryResponse(BaseModel):
     date: date
     total_amount: float
     count: int
+
+
+class AdjustPlanRequest(BaseModel):
+    target_amount: float = Field(gt=0)
+    saved_amount: float = Field(ge=0)
+    remaining_days: int = Field(gt=0)
+    planned_daily_saving: float = Field(ge=0)
+    actual_expense_today: float = Field(ge=0)
+    daily_available: float = Field(ge=0)
+
+
+class AdjustPlanResponse(BaseModel):
+    remaining_amount: float
+    today_gap: float
+    new_daily_saving: float
+    adjustment_per_day: float
+    status: str
+    message: str

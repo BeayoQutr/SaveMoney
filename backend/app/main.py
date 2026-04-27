@@ -13,8 +13,10 @@ from app.schemas import (
     ExpenseCreateResponse,
     ExpenseItemResponse,
     DailyExpenseSummaryResponse,
+    AdjustPlanRequest,
+    AdjustPlanResponse,
 )
-from app.budget_engine import generate_saving_plan
+from app.budget_engine import generate_saving_plan, adjust_saving_plan
 from app.database import engine, SessionLocal, Base
 from app.models import Expense
 
@@ -56,6 +58,11 @@ def health_check():
 @app.post("/plans/generate", response_model=GeneratePlanResponse)
 def generate_plan(data: GeneratePlanRequest):
     return generate_saving_plan(data)
+
+
+@app.post("/plans/adjust", response_model=AdjustPlanResponse)
+def adjust_plan(data: AdjustPlanRequest):
+    return adjust_saving_plan(data)
 
 
 def classify_expense(note: str) -> str:
