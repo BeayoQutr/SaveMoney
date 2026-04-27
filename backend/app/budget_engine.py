@@ -15,6 +15,8 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
             daily_available=0,
             target_amount=data.target_amount,
             feasibility_score=0,
+            minimum_living_cost=data.minimum_living_cost,
+            safe_saving_capacity=0,
             status="invalid",
             message="截止日期必须晚于今天"
         )
@@ -26,15 +28,33 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
             remaining_days=remaining_days,
             daily_saving=0,
             monthly_available=round(monthly_available, 2),
-            daily_available=round(monthly_available / 30, 2),
+            daily_available=0,
             target_amount=data.target_amount,
             feasibility_score=0,
+            minimum_living_cost=data.minimum_living_cost,
+            safe_saving_capacity=round(monthly_available - data.minimum_living_cost, 2),
             status="impossible",
             message="固定支出已经大于或等于收入，当前无法制定攒钱计划"
         )
 
+    safe_saving_capacity = monthly_available - data.minimum_living_cost
+
+    if safe_saving_capacity <= 0:
+        return GeneratePlanResponse(
+            remaining_days=remaining_days,
+            daily_saving=0,
+            monthly_available=round(monthly_available, 2),
+            daily_available=0,
+            target_amount=data.target_amount,
+            feasibility_score=0,
+            minimum_living_cost=data.minimum_living_cost,
+            safe_saving_capacity=round(safe_saving_capacity, 2),
+            status="impossible",
+            message="扣除固定支出和最低生活费后，当前没有可用于攒钱的余额"
+        )
+
     daily_saving = round(data.target_amount / remaining_days, 2)
-    daily_available = round(monthly_available / 30, 2)
+    daily_available = round(safe_saving_capacity / 30, 2)
 
     if daily_available <= 0:
         feasibility_score = 0
@@ -61,6 +81,8 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
         daily_available=daily_available,
         target_amount=data.target_amount,
         feasibility_score=feasibility_score,
+        minimum_living_cost=data.minimum_living_cost,
+        safe_saving_capacity=round(safe_saving_capacity, 2),
         status=status,
         message=message
     )

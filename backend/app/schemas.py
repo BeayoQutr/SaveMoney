@@ -8,6 +8,7 @@ class GeneratePlanRequest(BaseModel):
     target_amount: float = Field(gt=0)
     deadline: date
     identity: str
+    minimum_living_cost: float = Field(ge=0)
 
 
 class GeneratePlanResponse(BaseModel):
@@ -17,5 +18,7 @@ class GeneratePlanResponse(BaseModel):
     daily_available: float
     target_amount: float
     feasibility_score: int
+    minimum_living_cost: float
+    safe_saving_capacity: float
     status: str
     message: str

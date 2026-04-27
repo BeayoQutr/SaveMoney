@@ -9,6 +9,8 @@ type PlanResult = {
   daily_available: number;
   target_amount: number;
   feasibility_score: number;
+  minimum_living_cost: number;
+  safe_saving_capacity: number;
   status: string;
   message: string;
 };
@@ -18,6 +20,7 @@ export default function Home() {
   const [fixedExpenses, setFixedExpenses] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [minimumLivingCost, setMinimumLivingCost] = useState("");
   const [identity, setIdentity] = useState("student");
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState("");
@@ -37,6 +40,7 @@ export default function Home() {
           fixed_expenses: Number(fixedExpenses),
           target_amount: Number(targetAmount),
           deadline,
+          minimum_living_cost: Number(minimumLivingCost),
           identity,
         }),
       });
@@ -105,6 +109,17 @@ export default function Home() {
         </label>
 
         <label className="flex flex-col gap-1 text-sm font-medium">
+          每月最低生活费
+          <input
+            type="number"
+            value={minimumLivingCost}
+            onChange={(e) => setMinimumLivingCost(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+            placeholder="例如 800"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
           身份
           <select
             value={identity}
@@ -138,6 +153,8 @@ export default function Home() {
           <p>攒钱目标：{result.target_amount} 元</p>
           <p>日均可支配：{result.daily_available} 元</p>
           <p>可行性评分：{result.feasibility_score} / 100</p>
+          <p>每月最低生活费：{result.minimum_living_cost} 元</p>
+          <p>安全可攒金额：{result.safe_saving_capacity} 元</p>
           <p>状态：{result.status}</p>
           <p>说明：{result.message}</p>
         </section>
