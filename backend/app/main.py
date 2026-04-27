@@ -15,6 +15,8 @@ from app.schemas import (
     DailyExpenseSummaryResponse,
     AdjustPlanRequest,
     AdjustPlanResponse,
+    CategorySummaryItem,
+    CategorySummaryResponse,
 )
 from app.budget_engine import generate_saving_plan, adjust_saving_plan
 from app.database import engine, SessionLocal, Base
@@ -105,6 +107,35 @@ def list_expenses(db: Session = Depends(get_db)):
         .all()
     )
     return expenses
+
+
+@app.get("/expenses/summary/category", response_model=CategorySummaryResponse)
+def expenses_summary_category(start_date: date, end_date: date, db: Session = Depends(get_db)):
+    rows = (
+        db.query(
+            Expense.category,
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.count(Expense.id),
+        )
+        .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .group_by(Expense.category)
+        .all()
+    )
+
+    items = [
+        CategorySummaryItem(
+            category=row[0],
+            total_amount=round(float(row[1]), 2),
+            count=int(row[2]),
+        )
+        for row in rows
+    ]
+
+    return CategorySummaryResponse(
+        start_date=start_date,
+        end_date=end_date,
+        items=items,
+    )
 
 
 @app.post("/expenses", response_model=ExpenseCreateResponse)

@@ -69,3 +69,15 @@ class AdjustPlanResponse(BaseModel):
     adjustment_per_day: float
     status: str
     message: str
+
+
+class CategorySummaryItem(BaseModel):
+    category: str
+    total_amount: float
+    count: int
+
+
+class CategorySummaryResponse(BaseModel):
+    start_date: date
+    end_date: date
+    items: list[CategorySummaryItem]
