@@ -75,6 +75,55 @@ function getCurrentMonthStartDateString() {
   return `${year}-${month}-01`;
 }
 
+function generateMonthlyAdvice(data: MonthlySummary): string[] {
+  const advice: string[] = [];
+
+  if (data.count === 0) {
+    return ["本月暂无消费记录。先记录几笔日常开销，系统会根据数据分析消费结构。"];
+  }
+
+  if (data.total_amount === 0) {
+    return ["本月总消费为 0，暂无消费数据可供分析。"];
+  }
+
+  const sortedByAmount = [...data.items].sort((a, b) => b.total_amount - a.total_amount);
+
+  const top = sortedByAmount[0];
+  if (top) {
+    advice.push(`本月消费主要集中在「${top.category}」，可以优先关注这类支出是否符合预期。`);
+  }
+
+  for (const item of data.items) {
+    const pct = (item.total_amount / data.total_amount) * 100;
+
+    if (item.category === "餐饮" && pct > 50) {
+      advice.push("餐饮占比较高，可以关注外卖、零食和聚餐频次，适当减少高频小额支出。");
+    }
+    if (item.category === "交通" && pct > 20) {
+      advice.push("交通支出占比较高，可以考虑公交、地铁、步行或骑行等替代方式。");
+    }
+    if (item.category === "学习" && pct >= 10 && pct <= 30) {
+      advice.push("学习支出占比适中，这类投入通常有长期价值，可以继续保持。");
+    }
+    if (item.category === "医疗") {
+      advice.push("医疗支出属于必要支出，不建议为了省钱盲目压缩健康预算。");
+    }
+    if (item.category === "购物" && pct > 30) {
+      advice.push("购物支出占比较高，购买前可以先判断是否为必要消费。");
+    }
+  }
+
+  if (data.average_daily_amount > 100) {
+    advice.push(`本月日均消费为 ${data.average_daily_amount} 元，可以尝试设置每日预算上限。`);
+  }
+
+  if (advice.length === 0) {
+    advice.push("本月消费结构整体较均衡，可以继续保持当前记录习惯。");
+  }
+
+  return advice.slice(0, 4);
+}
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -109,6 +158,7 @@ export default function Home() {
 
   const [monthlyResult, setMonthlyResult] = useState<MonthlySummary | null>(null);
   const [monthlyError, setMonthlyError] = useState("");
+  const [monthlyAdvice, setMonthlyAdvice] = useState<string[]>([]);
 
   async function generatePlan() {
     setError("");
@@ -263,8 +313,10 @@ export default function Home() {
       }
       const data: MonthlySummary = await response.json();
       setMonthlyResult(data);
+      setMonthlyAdvice(generateMonthlyAdvice(data));
     } catch {
       setMonthlyError("本月总览查询失败，请检查后端服务");
+      setMonthlyAdvice([]);
     }
   }
 
@@ -702,6 +754,22 @@ export default function Home() {
 
       {monthlyResult && monthlyResult.count === 0 && (
         <p className="mt-4 text-gray-400">本月暂无消费记录</p>
+      )}
+
+      {monthlyAdvice.length > 0 && (
+        <section className="mt-4 max-w-md">
+          <h3 className="font-semibold text-gray-400">本月消费建议</h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {monthlyAdvice.map((line, index) => (
+              <li
+                key={index}
+                className="rounded-lg border border-gray-700 p-3 text-sm"
+              >
+                {line}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <hr className="mt-8 max-w-md border-gray-700" />
