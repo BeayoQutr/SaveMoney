@@ -125,12 +125,69 @@ function generateMonthlyAdvice(data: MonthlySummary): string[] {
 }
 
 export default function Home() {
-  const [monthlyIncome, setMonthlyIncome] = useState("");
-  const [fixedExpenses, setFixedExpenses] = useState("");
+  const [monthlyIncome, setMonthlyIncome] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    try {
+      const saved = localStorage.getItem("savemoney_preset");
+      if (saved) {
+        const preset = JSON.parse(saved);
+        return preset.monthlyIncome || "";
+      }
+    } catch {
+      // localStorage 不可用，静默跳过
+    }
+    return "";
+  });
+  const [fixedExpenses, setFixedExpenses] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    try {
+      const saved = localStorage.getItem("savemoney_preset");
+      if (saved) {
+        const preset = JSON.parse(saved);
+        return preset.fixedExpenses || "";
+      }
+    } catch {
+      // localStorage 不可用，静默跳过
+    }
+    return "";
+  });
   const [targetAmount, setTargetAmount] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [minimumLivingCost, setMinimumLivingCost] = useState("");
-  const [identity, setIdentity] = useState("student");
+  const [minimumLivingCost, setMinimumLivingCost] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    try {
+      const saved = localStorage.getItem("savemoney_preset");
+      if (saved) {
+        const preset = JSON.parse(saved);
+        return preset.minimumLivingCost || "";
+      }
+    } catch {
+      // localStorage 不可用，静默跳过
+    }
+    return "";
+  });
+  const [identity, setIdentity] = useState(() => {
+    if (typeof window === "undefined") {
+      return "student";
+    }
+    try {
+      const saved = localStorage.getItem("savemoney_preset");
+      if (saved) {
+        const preset = JSON.parse(saved);
+        return preset.identity || "student";
+      }
+    } catch {
+      // localStorage 不可用，静默跳过
+    }
+    return "student";
+  });
+  const [savePresetMessage, setSavePresetMessage] = useState("");
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState("");
 
@@ -198,6 +255,21 @@ export default function Home() {
       setResult(data);
     } catch {
       setError("生成失败，请确认后端已启动");
+    }
+  }
+
+  function savePreset() {
+    const preset = {
+      monthlyIncome,
+      fixedExpenses,
+      minimumLivingCost,
+      identity,
+    };
+    try {
+      localStorage.setItem("savemoney_preset", JSON.stringify(preset));
+      setSavePresetMessage("常用信息已保存");
+    } catch {
+      setSavePresetMessage("保存失败，请检查浏览器设置");
     }
   }
 
@@ -536,6 +608,25 @@ export default function Home() {
         >
           生成攒钱计划
         </button>
+
+        <button
+          onClick={savePreset}
+          className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-400 hover:text-white"
+        >
+          保存常用信息
+        </button>
+
+        {savePresetMessage && (
+          <p
+            className={
+              savePresetMessage === "保存失败，请检查浏览器设置"
+                ? "text-sm text-red-600 font-medium"
+                : "text-sm text-gray-400"
+            }
+          >
+            {savePresetMessage}
+          </p>
+        )}
       </section>
 
       {error && (
