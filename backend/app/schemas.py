@@ -81,3 +81,11 @@ class CategorySummaryResponse(BaseModel):
     start_date: date
     end_date: date
     items: list[CategorySummaryItem]
+
+
+class MonthlyExpenseSummaryResponse(BaseModel):
+    month: str
+    total_amount: float
+    count: int
+    average_daily_amount: float
+    items: list[CategorySummaryItem]

@@ -1,8 +1,10 @@
-from fastapi import FastAPI, Depends
+import calendar
+
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from datetime import date
+from datetime import date, datetime
 from typing import List
 
 from sqlalchemy import func
@@ -17,6 +19,7 @@ from app.schemas import (
     AdjustPlanResponse,
     CategorySummaryItem,
     CategorySummaryResponse,
+    MonthlyExpenseSummaryResponse,
 )
 from app.budget_engine import generate_saving_plan, adjust_saving_plan
 from app.database import engine, SessionLocal, Base
@@ -134,6 +137,61 @@ def expenses_summary_category(start_date: date, end_date: date, db: Session = De
     return CategorySummaryResponse(
         start_date=start_date,
         end_date=end_date,
+        items=items,
+    )
+
+
+@app.get("/expenses/summary/monthly", response_model=MonthlyExpenseSummaryResponse)
+def expenses_summary_monthly(month: str, db: Session = Depends(get_db)):
+    try:
+        parsed = datetime.strptime(month + "-01", "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="month 格式错误，应为 YYYY-MM")
+
+    year = parsed.year
+    month_int = parsed.month
+    days_in_month = calendar.monthrange(year, month_int)[1]
+
+    start_date = date(year, month_int, 1)
+    end_date = date(year, month_int, days_in_month)
+
+    overall = (
+        db.query(
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.count(Expense.id),
+        )
+        .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .first()
+    )
+    total = round(float(overall[0]), 2)
+    count = int(overall[1])
+    average_daily = round(total / days_in_month, 2) if days_in_month > 0 else 0.0
+
+    rows = (
+        db.query(
+            Expense.category,
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.count(Expense.id),
+        )
+        .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .group_by(Expense.category)
+        .all()
+    )
+
+    items = [
+        CategorySummaryItem(
+            category=row[0],
+            total_amount=round(float(row[1]), 2),
+            count=int(row[2]),
+        )
+        for row in rows
+    ]
+
+    return MonthlyExpenseSummaryResponse(
+        month=month,
+        total_amount=total,
+        count=count,
+        average_daily_amount=average_daily,
         items=items,
     )
 
