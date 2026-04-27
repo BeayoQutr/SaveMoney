@@ -52,6 +52,14 @@ type CategoryItem = {
   count: number;
 };
 
+type MonthlySummary = {
+  month: string;
+  total_amount: number;
+  count: number;
+  average_daily_amount: number;
+  items: CategoryItem[];
+};
+
 function getTodayLocalDateString() {
   const now = new Date();
   const year = now.getFullYear();
@@ -98,6 +106,9 @@ export default function Home() {
   const [categoryEndDate, setCategoryEndDate] = useState("");
   const [categoryResult, setCategoryResult] = useState<CategoryItem[] | null>(null);
   const [categoryError, setCategoryError] = useState("");
+
+  const [monthlyResult, setMonthlyResult] = useState<MonthlySummary | null>(null);
+  const [monthlyError, setMonthlyError] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -238,6 +249,25 @@ export default function Home() {
     await queryCategorySummaryByRange(categoryStartDate, categoryEndDate);
   }
 
+  async function fetchMonthlySummary() {
+    setMonthlyError("");
+    setMonthlyResult(null);
+
+    try {
+      const monthKey = getCurrentMonthStartDateString().substring(0, 7);
+      const response = await fetch(
+        `http://127.0.0.1:8000/expenses/summary/monthly?month=${monthKey}`
+      );
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+      const data: MonthlySummary = await response.json();
+      setMonthlyResult(data);
+    } catch {
+      setMonthlyError("本月总览查询失败，请检查后端服务");
+    }
+  }
+
   useEffect(() => {
     /* eslint-disable */
     void fetchExpenses();
@@ -268,6 +298,7 @@ export default function Home() {
       const data: ExpenseResult = await response.json();
       setExpenseResult(data);
       fetchExpenses();
+      fetchMonthlySummary();
     } catch {
       setExpenseError("记录失败，请确认后端已启动");
     }
@@ -616,6 +647,61 @@ export default function Home() {
 
       {categoryResult && categoryResult.length === 0 && (
         <p className="mt-4 text-gray-400">该日期范围内暂无消费记录</p>
+      )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">本月总览</h2>
+
+      <section className="mt-4 flex max-w-md flex-col gap-4">
+        <button
+          onClick={fetchMonthlySummary}
+          className="rounded-lg bg-black px-4 py-2 text-white"
+        >
+          刷新本月总览
+        </button>
+      </section>
+
+      {monthlyError && (
+        <p className="mt-4 text-red-600 font-medium">{monthlyError}</p>
+      )}
+
+      {monthlyResult && monthlyResult.count > 0 && (
+        <section className="mt-4 max-w-md rounded-xl border p-4">
+          <p>当前月份：{monthlyResult.month}</p>
+          <p>本月总消费：{monthlyResult.total_amount} 元</p>
+          <p>本月消费笔数：{monthlyResult.count}</p>
+          <p>日均消费：{monthlyResult.average_daily_amount} 元</p>
+
+          {monthlyResult.items.length > 0 && (
+            <div className="mt-4 flex flex-col gap-3">
+              <h3 className="font-semibold text-gray-400">分类明细</h3>
+              {monthlyResult.items.map((item, index) => (
+                <div
+                  key={index}
+                  className="rounded-xl border border-gray-700 p-3"
+                >
+                  <p>
+                    <span className="text-gray-400">分类：</span>
+                    {item.category}
+                  </p>
+                  <p>
+                    <span className="text-gray-400">总金额：</span>
+                    {item.total_amount} 元
+                  </p>
+                  <p>
+                    <span className="text-gray-400">笔数：</span>
+                    {item.count}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {monthlyResult && monthlyResult.count === 0 && (
+        <p className="mt-4 text-gray-400">本月暂无消费记录</p>
       )}
 
       <hr className="mt-8 max-w-md border-gray-700" />
