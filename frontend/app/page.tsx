@@ -52,6 +52,14 @@ type CategoryItem = {
   count: number;
 };
 
+function getTodayLocalDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -166,7 +174,7 @@ export default function Home() {
   }
 
   async function fillTodayExpense() {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayLocalDateString();
     try {
       const response = await fetch(
         `http://127.0.0.1:8000/expenses/summary/daily?query_date=${today}`
