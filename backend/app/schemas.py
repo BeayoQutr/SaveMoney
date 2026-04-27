@@ -37,3 +37,11 @@ class ExpenseCreateResponse(BaseModel):
     date: date
     category: str
     message: str
+
+
+class ExpenseItemResponse(BaseModel):
+    id: int
+    amount: float
+    note: str
+    date: date
+    category: str

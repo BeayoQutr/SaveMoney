@@ -2,8 +2,10 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from typing import List
+
 from app.schemas import GeneratePlanRequest, GeneratePlanResponse
-from app.schemas import ExpenseCreateRequest, ExpenseCreateResponse
+from app.schemas import ExpenseCreateRequest, ExpenseCreateResponse, ExpenseItemResponse
 from app.budget_engine import generate_saving_plan
 from app.database import engine, SessionLocal, Base
 from app.models import Expense
@@ -58,6 +60,17 @@ def classify_expense(note: str) -> str:
     if any(kw in note for kw in ["药", "医院"]):
         return "医疗"
     return "其他"
+
+
+@app.get("/expenses", response_model=List[ExpenseItemResponse])
+def list_expenses(db: Session = Depends(get_db)):
+    expenses = (
+        db.query(Expense)
+        .order_by(Expense.id.desc())
+        .limit(50)
+        .all()
+    )
+    return expenses
 
 
 @app.post("/expenses", response_model=ExpenseCreateResponse)
