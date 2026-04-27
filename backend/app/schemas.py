@@ -7,6 +7,7 @@ class GeneratePlanRequest(BaseModel):
     fixed_expenses: float = Field(ge=0)
     target_amount: float = Field(gt=0)
     deadline: date
+    identity: str
 
 
 class GeneratePlanResponse(BaseModel):

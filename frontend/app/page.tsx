@@ -18,6 +18,7 @@ export default function Home() {
   const [fixedExpenses, setFixedExpenses] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [identity, setIdentity] = useState("student");
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState("");
 
@@ -36,6 +37,7 @@ export default function Home() {
           fixed_expenses: Number(fixedExpenses),
           target_amount: Number(targetAmount),
           deadline,
+          identity,
         }),
       });
 
@@ -100,6 +102,20 @@ export default function Home() {
             onChange={(e) => setDeadline(e.target.value)}
             className="rounded-lg border px-3 py-2"
           />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          身份
+          <select
+            value={identity}
+            onChange={(e) => setIdentity(e.target.value)}
+            className="rounded-lg border border-gray-600 px-3 py-2 bg-gray-900 text-white"
+          >
+            <option value="student">学生</option>
+            <option value="worker">上班族</option>
+            <option value="freelancer">自由职业者</option>
+            <option value="other">其他</option>
+          </select>
         </label>
 
         <button
