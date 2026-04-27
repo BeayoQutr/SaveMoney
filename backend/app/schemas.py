@@ -45,3 +45,9 @@ class ExpenseItemResponse(BaseModel):
     note: str
     date: date
     category: str
+
+
+class DailyExpenseSummaryResponse(BaseModel):
+    date: date
+    total_amount: float
+    count: int

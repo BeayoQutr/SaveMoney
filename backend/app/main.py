@@ -2,10 +2,18 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from datetime import date
 from typing import List
 
+from sqlalchemy import func
+
 from app.schemas import GeneratePlanRequest, GeneratePlanResponse
-from app.schemas import ExpenseCreateRequest, ExpenseCreateResponse, ExpenseItemResponse
+from app.schemas import (
+    ExpenseCreateRequest,
+    ExpenseCreateResponse,
+    ExpenseItemResponse,
+    DailyExpenseSummaryResponse,
+)
 from app.budget_engine import generate_saving_plan
 from app.database import engine, SessionLocal, Base
 from app.models import Expense
@@ -60,6 +68,25 @@ def classify_expense(note: str) -> str:
     if any(kw in note for kw in ["药", "医院"]):
         return "医疗"
     return "其他"
+
+
+@app.get("/expenses/summary/daily", response_model=DailyExpenseSummaryResponse)
+def daily_expense_summary(query_date: date, db: Session = Depends(get_db)):
+    result = (
+        db.query(
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.count(Expense.id),
+        )
+        .filter(Expense.date == query_date)
+        .first()
+    )
+    total = round(float(result[0]), 2)
+    count = int(result[1])
+    return DailyExpenseSummaryResponse(
+        date=query_date,
+        total_amount=total,
+        count=count,
+    )
 
 
 @app.get("/expenses", response_model=List[ExpenseItemResponse])
