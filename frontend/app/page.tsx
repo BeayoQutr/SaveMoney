@@ -60,6 +60,13 @@ function getTodayLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
+function getCurrentMonthStartDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
+}
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -207,13 +214,15 @@ export default function Home() {
     }
   }
 
-  async function queryCategorySummary() {
+  async function queryCategorySummaryByRange(start: string, end: string) {
     setCategoryError("");
     setCategoryResult(null);
+    setCategoryStartDate(start);
+    setCategoryEndDate(end);
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/expenses/summary/category?start_date=${categoryStartDate}&end_date=${categoryEndDate}`
+        `http://127.0.0.1:8000/expenses/summary/category?start_date=${start}&end_date=${end}`
       );
       if (!response.ok) {
         throw new Error("请求失败");
@@ -223,6 +232,10 @@ export default function Home() {
     } catch {
       setCategoryError("查询消费分类统计失败");
     }
+  }
+
+  async function queryCategorySummary() {
+    await queryCategorySummaryByRange(categoryStartDate, categoryEndDate);
   }
 
   useEffect(() => {
@@ -539,6 +552,31 @@ export default function Home() {
             className="rounded-lg border px-3 py-2"
           />
         </label>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() =>
+              queryCategorySummaryByRange(
+                getTodayLocalDateString(),
+                getTodayLocalDateString()
+              )
+            }
+            className="rounded-lg border px-3 py-2 text-sm text-gray-400 hover:text-white"
+          >
+            查询今日
+          </button>
+          <button
+            onClick={() =>
+              queryCategorySummaryByRange(
+                getCurrentMonthStartDateString(),
+                getTodayLocalDateString()
+              )
+            }
+            className="rounded-lg border px-3 py-2 text-sm text-gray-400 hover:text-white"
+          >
+            查询本月
+          </button>
+        </div>
 
         <button
           onClick={queryCategorySummary}
