@@ -233,3 +233,28 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
         message="消费记录删除成功",
         deleted_id=expense_id,
     )
+
+
+@app.put("/expenses/{expense_id}", response_model=ExpenseCreateResponse)
+def update_expense(expense_id: int, data: ExpenseCreateRequest, db: Session = Depends(get_db)):
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if expense is None:
+        raise HTTPException(status_code=404, detail="消费记录不存在")
+
+    expense.amount = data.amount
+    expense.note = data.note
+    expense.date = data.date
+    expense.category = classify_expense(data.note)
+
+    db.commit()
+    db.refresh(expense)
+
+    return ExpenseCreateResponse(
+        id=expense.id,
+        amount=expense.amount,
+        note=expense.note,
+        date=expense.date,
+        category=expense.category,
+        message="消费记录更新成功",
+    )
