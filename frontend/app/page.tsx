@@ -46,6 +46,12 @@ type AdjustResult = {
   message: string;
 };
 
+type CategoryItem = {
+  category: string;
+  total_amount: number;
+  count: number;
+};
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -72,6 +78,11 @@ export default function Home() {
   const [actualExpenseToday, setActualExpenseToday] = useState("");
   const [adjustResult, setAdjustResult] = useState<AdjustResult | null>(null);
   const [adjustError, setAdjustError] = useState("");
+
+  const [categoryStartDate, setCategoryStartDate] = useState("");
+  const [categoryEndDate, setCategoryEndDate] = useState("");
+  const [categoryResult, setCategoryResult] = useState<CategoryItem[] | null>(null);
+  const [categoryError, setCategoryError] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -185,6 +196,24 @@ export default function Home() {
       setSummaryResult(data);
     } catch {
       setSummaryError("消费汇总查询失败，请确认后端已启动");
+    }
+  }
+
+  async function queryCategorySummary() {
+    setCategoryError("");
+    setCategoryResult(null);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/expenses/summary/category?start_date=${categoryStartDate}&end_date=${categoryEndDate}`
+      );
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+      const data = await response.json();
+      setCategoryResult(data.items);
+    } catch {
+      setCategoryError("查询消费分类统计失败");
     }
   }
 
@@ -476,6 +505,71 @@ export default function Home() {
           <p>消费总额：{summaryResult.total_amount} 元</p>
           <p>消费笔数：{summaryResult.count}</p>
         </section>
+      )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">消费分类统计</h2>
+
+      <section className="mt-4 flex max-w-md flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          开始日期
+          <input
+            type="date"
+            value={categoryStartDate}
+            onChange={(e) => setCategoryStartDate(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          结束日期
+          <input
+            type="date"
+            value={categoryEndDate}
+            onChange={(e) => setCategoryEndDate(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+          />
+        </label>
+
+        <button
+          onClick={queryCategorySummary}
+          className="mt-2 rounded-lg bg-black px-4 py-2 text-white"
+        >
+          查询分类统计
+        </button>
+      </section>
+
+      {categoryError && (
+        <p className="mt-4 text-red-600 font-medium">{categoryError}</p>
+      )}
+
+      {categoryResult && categoryResult.length > 0 && (
+        <section className="mt-4 max-w-md flex flex-col gap-3">
+          {categoryResult.map((item, index) => (
+            <div
+              key={index}
+              className="rounded-xl border border-gray-700 p-3"
+            >
+              <p>
+                <span className="text-gray-400">分类：</span>
+                {item.category}
+              </p>
+              <p>
+                <span className="text-gray-400">总金额：</span>
+                {item.total_amount} 元
+              </p>
+              <p>
+                <span className="text-gray-400">笔数：</span>
+                {item.count}
+              </p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {categoryResult && categoryResult.length === 0 && (
+        <p className="mt-4 text-gray-400">该日期范围内暂无消费记录</p>
       )}
 
       <hr className="mt-8 max-w-md border-gray-700" />
