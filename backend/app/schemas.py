@@ -89,3 +89,8 @@ class MonthlyExpenseSummaryResponse(BaseModel):
     count: int
     average_daily_amount: float
     items: list[CategorySummaryItem]
+
+
+class ExpenseDeleteResponse(BaseModel):
+    message: str
+    deleted_id: int

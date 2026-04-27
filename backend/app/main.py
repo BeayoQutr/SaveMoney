@@ -20,6 +20,7 @@ from app.schemas import (
     CategorySummaryItem,
     CategorySummaryResponse,
     MonthlyExpenseSummaryResponse,
+    ExpenseDeleteResponse,
 )
 from app.budget_engine import generate_saving_plan, adjust_saving_plan
 from app.database import engine, SessionLocal, Base
@@ -215,4 +216,20 @@ def create_expense(data: ExpenseCreateRequest, db: Session = Depends(get_db)):
         date=expense.date,
         category=expense.category,
         message="消费记录成功"
+    )
+
+
+@app.delete("/expenses/{expense_id}", response_model=ExpenseDeleteResponse)
+def delete_expense(expense_id: int, db: Session = Depends(get_db)):
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if expense is None:
+        raise HTTPException(status_code=404, detail="消费记录不存在")
+
+    db.delete(expense)
+    db.commit()
+
+    return ExpenseDeleteResponse(
+        message="消费记录删除成功",
+        deleted_id=expense_id,
     )
