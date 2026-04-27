@@ -22,3 +22,17 @@ class GeneratePlanResponse(BaseModel):
     safe_saving_capacity: float
     status: str
     message: str
+
+
+class ExpenseCreateRequest(BaseModel):
+    amount: float = Field(gt=0)
+    note: str = Field(min_length=1)
+    date: date
+
+
+class ExpenseCreateResponse(BaseModel):
+    amount: float
+    note: str
+    date: date
+    category: str
+    message: str
