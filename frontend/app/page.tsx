@@ -31,6 +31,12 @@ type ExpenseItem = {
   category: string;
 };
 
+type DailySummary = {
+  date: string;
+  total_amount: number;
+  count: number;
+};
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -48,6 +54,10 @@ export default function Home() {
   const [expenseError, setExpenseError] = useState("");
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>([]);
   const [expenseListError, setExpenseListError] = useState("");
+
+  const [summaryDate, setSummaryDate] = useState("");
+  const [summaryResult, setSummaryResult] = useState<DailySummary | null>(null);
+  const [summaryError, setSummaryError] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -93,6 +103,24 @@ export default function Home() {
       setExpenseListError("消费记录加载失败，请确认后端已启动");
     }
   }, []);
+
+  async function querySummary() {
+    setSummaryError("");
+    setSummaryResult(null);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/expenses/summary/daily?query_date=${summaryDate}`
+      );
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+      const data: DailySummary = await response.json();
+      setSummaryResult(data);
+    } catch {
+      setSummaryError("消费汇总查询失败，请确认后端已启动");
+    }
+  }
 
   useEffect(() => {
     /* eslint-disable */
@@ -289,6 +317,41 @@ export default function Home() {
           <p>日期：{expenseResult.date}</p>
           <p>分类：{expenseResult.category}</p>
           <p>说明：{expenseResult.message}</p>
+        </section>
+      )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">每日消费汇总</h2>
+
+      <section className="mt-4 flex max-w-md flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          查询日期
+          <input
+            type="date"
+            value={summaryDate}
+            onChange={(e) => setSummaryDate(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+          />
+        </label>
+
+        <button
+          onClick={querySummary}
+          className="mt-2 rounded-lg bg-black px-4 py-2 text-white"
+        >
+          查询汇总
+        </button>
+      </section>
+
+      {summaryError && (
+        <p className="mt-4 text-red-600 font-medium">{summaryError}</p>
+      )}
+
+      {summaryResult && (
+        <section className="mt-4 rounded-xl border p-4 max-w-md">
+          <p>日期：{summaryResult.date}</p>
+          <p>消费总额：{summaryResult.total_amount} 元</p>
+          <p>消费笔数：{summaryResult.count}</p>
         </section>
       )}
 
