@@ -1,11 +1,24 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.schemas import GeneratePlanRequest, GeneratePlanResponse
 from app.schemas import ExpenseCreateRequest, ExpenseCreateResponse
 from app.budget_engine import generate_saving_plan
+from app.database import engine, SessionLocal, Base
+from app.models import Expense
 
 app = FastAPI(title="SaveMoney API")
+
+Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,12 +61,22 @@ def classify_expense(note: str) -> str:
 
 
 @app.post("/expenses", response_model=ExpenseCreateResponse)
-def create_expense(data: ExpenseCreateRequest):
+def create_expense(data: ExpenseCreateRequest, db: Session = Depends(get_db)):
     category = classify_expense(data.note)
-    return ExpenseCreateResponse(
+    expense = Expense(
         amount=data.amount,
         note=data.note,
         date=data.date,
         category=category,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    return ExpenseCreateResponse(
+        id=expense.id,
+        amount=expense.amount,
+        note=expense.note,
+        date=expense.date,
+        category=expense.category,
         message="消费记录成功"
     )

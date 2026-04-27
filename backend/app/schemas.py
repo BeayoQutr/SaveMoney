@@ -31,6 +31,7 @@ class ExpenseCreateRequest(BaseModel):
 
 
 class ExpenseCreateResponse(BaseModel):
+    id: int
     amount: float
     note: str
     date: date
