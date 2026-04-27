@@ -13,5 +13,8 @@ class GeneratePlanResponse(BaseModel):
     remaining_days: int
     daily_saving: float
     monthly_available: float
+    daily_available: float
+    target_amount: float
+    feasibility_score: int
     status: str
     message: str

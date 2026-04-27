@@ -6,6 +6,9 @@ type PlanResult = {
   remaining_days: number;
   daily_saving: number;
   monthly_available: number;
+  daily_available: number;
+  target_amount: number;
+  feasibility_score: number;
   status: string;
   message: string;
 };
@@ -116,6 +119,9 @@ export default function Home() {
           <p>剩余天数：{result.remaining_days}</p>
           <p>每日需存：{result.daily_saving} 元</p>
           <p>每月可支配：{result.monthly_available} 元</p>
+          <p>攒钱目标：{result.target_amount} 元</p>
+          <p>日均可支配：{result.daily_available} 元</p>
+          <p>可行性评分：{result.feasibility_score} / 100</p>
           <p>状态：{result.status}</p>
           <p>说明：{result.message}</p>
         </section>

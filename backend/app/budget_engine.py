@@ -12,6 +12,9 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
             remaining_days=0,
             daily_saving=0,
             monthly_available=0,
+            daily_available=0,
+            target_amount=data.target_amount,
+            feasibility_score=0,
             status="invalid",
             message="截止日期必须晚于今天"
         )
@@ -22,13 +25,27 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
         return GeneratePlanResponse(
             remaining_days=remaining_days,
             daily_saving=0,
-            monthly_available=monthly_available,
+            monthly_available=round(monthly_available, 2),
+            daily_available=round(monthly_available / 30, 2),
+            target_amount=data.target_amount,
+            feasibility_score=0,
             status="impossible",
             message="固定支出已经大于或等于收入，当前无法制定攒钱计划"
         )
 
     daily_saving = round(data.target_amount / remaining_days, 2)
-    daily_available = monthly_available / 30
+    daily_available = round(monthly_available / 30, 2)
+
+    if daily_available <= 0:
+        feasibility_score = 0
+    elif daily_saving <= daily_available:
+        feasibility_score = 100
+    else:
+        feasibility_score = int((daily_available / daily_saving) * 100)
+        if feasibility_score < 0:
+            feasibility_score = 0
+        elif feasibility_score > 100:
+            feasibility_score = 100
 
     if daily_saving > daily_available:
         status = "hard"
@@ -41,6 +58,9 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
         remaining_days=remaining_days,
         daily_saving=daily_saving,
         monthly_available=round(monthly_available, 2),
+        daily_available=daily_available,
+        target_amount=data.target_amount,
+        feasibility_score=feasibility_score,
         status=status,
         message=message
     )
