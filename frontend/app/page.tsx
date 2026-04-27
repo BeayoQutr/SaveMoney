@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 type PlanResult = {
   remaining_days: number;
@@ -23,6 +23,14 @@ type ExpenseResult = {
   message: string;
 };
 
+type ExpenseItem = {
+  id: number;
+  amount: number;
+  note: string;
+  date: string;
+  category: string;
+};
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -38,6 +46,8 @@ export default function Home() {
   const [expenseDate, setExpenseDate] = useState("");
   const [expenseResult, setExpenseResult] = useState<ExpenseResult | null>(null);
   const [expenseError, setExpenseError] = useState("");
+  const [expenseList, setExpenseList] = useState<ExpenseItem[]>([]);
+  const [expenseListError, setExpenseListError] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -70,6 +80,26 @@ export default function Home() {
     }
   }
 
+  const fetchExpenses = useCallback(async () => {
+    setExpenseListError("");
+    try {
+      const response = await fetch("http://127.0.0.1:8000/expenses");
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+      const data: ExpenseItem[] = await response.json();
+      setExpenseList(data);
+    } catch {
+      setExpenseListError("消费记录加载失败，请确认后端已启动");
+    }
+  }, []);
+
+  useEffect(() => {
+    /* eslint-disable */
+    void fetchExpenses();
+    /* eslint-enable */
+  }, []);
+
   async function recordExpense() {
     setExpenseError("");
     setExpenseResult(null);
@@ -93,6 +123,7 @@ export default function Home() {
 
       const data: ExpenseResult = await response.json();
       setExpenseResult(data);
+      fetchExpenses();
     } catch {
       setExpenseError("记录失败，请确认后端已启动");
     }
@@ -258,6 +289,42 @@ export default function Home() {
           <p>日期：{expenseResult.date}</p>
           <p>分类：{expenseResult.category}</p>
           <p>说明：{expenseResult.message}</p>
+        </section>
+      )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">最近消费记录</h2>
+
+      {expenseListError && (
+        <p className="mt-4 text-red-600 font-medium">{expenseListError}</p>
+      )}
+
+      {expenseList.length > 0 && (
+        <section className="mt-4 max-w-md flex flex-col gap-3">
+          {expenseList.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-xl border border-gray-700 p-3"
+            >
+              <p>
+                <span className="text-gray-400">金额：</span>
+                {item.amount} 元
+              </p>
+              <p>
+                <span className="text-gray-400">备注：</span>
+                {item.note}
+              </p>
+              <p>
+                <span className="text-gray-400">日期：</span>
+                {item.date}
+              </p>
+              <p>
+                <span className="text-gray-400">分类：</span>
+                {item.category}
+              </p>
+            </div>
+          ))}
         </section>
       )}
     </main>
