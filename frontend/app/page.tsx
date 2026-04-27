@@ -37,6 +37,15 @@ type DailySummary = {
   count: number;
 };
 
+type AdjustResult = {
+  remaining_amount: number;
+  today_gap: number;
+  new_daily_saving: number;
+  adjustment_per_day: number;
+  status: string;
+  message: string;
+};
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -58,6 +67,11 @@ export default function Home() {
   const [summaryDate, setSummaryDate] = useState("");
   const [summaryResult, setSummaryResult] = useState<DailySummary | null>(null);
   const [summaryError, setSummaryError] = useState("");
+
+  const [savedAmount, setSavedAmount] = useState("");
+  const [actualExpenseToday, setActualExpenseToday] = useState("");
+  const [adjustResult, setAdjustResult] = useState<AdjustResult | null>(null);
+  const [adjustError, setAdjustError] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -103,6 +117,42 @@ export default function Home() {
       setExpenseListError("消费记录加载失败，请确认后端已启动");
     }
   }, []);
+
+  async function adjustPlan() {
+    setAdjustError("");
+    setAdjustResult(null);
+
+    if (!result) {
+      setAdjustError("请先生成攒钱计划");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/plans/adjust", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          target_amount: result.target_amount,
+          saved_amount: Number(savedAmount),
+          remaining_days: result.remaining_days,
+          planned_daily_saving: result.daily_saving,
+          actual_expense_today: Number(actualExpenseToday),
+          daily_available: result.daily_available,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+
+      const data: AdjustResult = await response.json();
+      setAdjustResult(data);
+    } catch {
+      setAdjustError("调整失败，请确认后端已启动");
+    }
+  }
 
   async function querySummary() {
     setSummaryError("");
@@ -258,6 +308,56 @@ export default function Home() {
           <p>安全可攒金额：{result.safe_saving_capacity} 元</p>
           <p>状态：{result.status}</p>
           <p>说明：{result.message}</p>
+        </section>
+      )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">动态调整计划</h2>
+
+      <section className="mt-4 flex max-w-md flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          已攒金额
+          <input
+            type="number"
+            value={savedAmount}
+            onChange={(e) => setSavedAmount(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+            placeholder="例如 500"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          今日实际消费
+          <input
+            type="number"
+            value={actualExpenseToday}
+            onChange={(e) => setActualExpenseToday(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+            placeholder="例如 50"
+          />
+        </label>
+
+        <button
+          onClick={adjustPlan}
+          className="mt-2 rounded-lg bg-black px-4 py-2 text-white"
+        >
+          调整计划
+        </button>
+      </section>
+
+      {adjustError && (
+        <p className="mt-4 text-red-600 font-medium">{adjustError}</p>
+      )}
+
+      {adjustResult && (
+        <section className="mt-4 rounded-xl border p-4 max-w-md">
+          <p>剩余需攒金额：{adjustResult.remaining_amount} 元</p>
+          <p>今日差距：{adjustResult.today_gap} 元</p>
+          <p>新的每日需存：{adjustResult.new_daily_saving} 元</p>
+          <p>每日调整幅度：{adjustResult.adjustment_per_day} 元</p>
+          <p>状态：{adjustResult.status}</p>
+          <p>建议：{adjustResult.message}</p>
         </section>
       )}
 
