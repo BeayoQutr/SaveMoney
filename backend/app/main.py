@@ -1,7 +1,10 @@
 import calendar
+import csv
+import io
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from datetime import date, datetime
@@ -257,4 +260,32 @@ def update_expense(expense_id: int, data: ExpenseCreateRequest, db: Session = De
         date=expense.date,
         category=expense.category,
         message="消费记录更新成功",
+    )
+
+
+@app.get("/expenses/export/csv")
+def export_expenses_csv(
+    start_date: date,
+    end_date: date,
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(Expense)
+        .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .order_by(Expense.date.asc(), Expense.id.asc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "amount", "note", "date", "category"])
+    for e in rows:
+        writer.writerow([e.id, e.amount, e.note, e.date.isoformat(), e.category])
+
+    filename = f"expenses_{start_date.isoformat()}_to_{end_date.isoformat()}.csv"
+
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
