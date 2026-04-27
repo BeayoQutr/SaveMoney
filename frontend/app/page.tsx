@@ -15,6 +15,14 @@ type PlanResult = {
   message: string;
 };
 
+type ExpenseResult = {
+  amount: number;
+  note: string;
+  date: string;
+  category: string;
+  message: string;
+};
+
 export default function Home() {
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [fixedExpenses, setFixedExpenses] = useState("");
@@ -24,6 +32,12 @@ export default function Home() {
   const [identity, setIdentity] = useState("student");
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState("");
+
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseNote, setExpenseNote] = useState("");
+  const [expenseDate, setExpenseDate] = useState("");
+  const [expenseResult, setExpenseResult] = useState<ExpenseResult | null>(null);
+  const [expenseError, setExpenseError] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -53,6 +67,34 @@ export default function Home() {
       setResult(data);
     } catch {
       setError("生成失败，请确认后端已启动");
+    }
+  }
+
+  async function recordExpense() {
+    setExpenseError("");
+    setExpenseResult(null);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/expenses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: Number(expenseAmount),
+          note: expenseNote,
+          date: expenseDate,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("请求失败");
+      }
+
+      const data: ExpenseResult = await response.json();
+      setExpenseResult(data);
+    } catch {
+      setExpenseError("记录失败，请确认后端已启动");
     }
   }
 
@@ -157,6 +199,65 @@ export default function Home() {
           <p>安全可攒金额：{result.safe_saving_capacity} 元</p>
           <p>状态：{result.status}</p>
           <p>说明：{result.message}</p>
+        </section>
+      )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">记录今日消费</h2>
+
+      <section className="mt-4 flex max-w-md flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          消费金额
+          <input
+            type="number"
+            value={expenseAmount}
+            onChange={(e) => setExpenseAmount(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+            placeholder="例如 35"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          消费备注
+          <input
+            type="text"
+            value={expenseNote}
+            onChange={(e) => setExpenseNote(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+            placeholder="例如 午餐"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          消费日期
+          <input
+            type="date"
+            value={expenseDate}
+            onChange={(e) => setExpenseDate(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+          />
+        </label>
+
+        <button
+          onClick={recordExpense}
+          className="mt-2 rounded-lg bg-black px-4 py-2 text-white"
+        >
+          记录消费
+        </button>
+      </section>
+
+      {expenseError && (
+        <p className="mt-4 text-red-600 font-medium">{expenseError}</p>
+      )}
+
+      {expenseResult && (
+        <section className="mt-4 rounded-xl border p-4 max-w-md">
+          <p>消费金额：{expenseResult.amount} 元</p>
+          <p>备注：{expenseResult.note}</p>
+          <p>日期：{expenseResult.date}</p>
+          <p>分类：{expenseResult.category}</p>
+          <p>说明：{expenseResult.message}</p>
         </section>
       )}
     </main>
