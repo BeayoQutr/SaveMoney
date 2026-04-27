@@ -148,6 +148,10 @@ export default function Home() {
   const [editDate, setEditDate] = useState("");
   const [editError, setEditError] = useState("");
 
+  const [exportStartDate, setExportStartDate] = useState(getCurrentMonthStartDateString());
+  const [exportEndDate, setExportEndDate] = useState(getTodayLocalDateString());
+  const [exportError, setExportError] = useState("");
+
   const [summaryDate, setSummaryDate] = useState("");
   const [summaryResult, setSummaryResult] = useState<DailySummary | null>(null);
   const [summaryError, setSummaryError] = useState("");
@@ -415,6 +419,37 @@ export default function Home() {
       fetchMonthlySummary();
     } catch {
       setEditError("更新失败，请确认后端已启动或记录是否仍然存在");
+    }
+  }
+
+  async function exportCsv() {
+    setExportError("");
+
+    if (!exportStartDate || !exportEndDate) {
+      setExportError("请选择开始日期和结束日期");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/expenses/export/csv?start_date=${exportStartDate}&end_date=${exportEndDate}`
+      );
+
+      if (!response.ok) {
+        throw new Error("导出失败");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `expenses_${exportStartDate}_to_${exportEndDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("导出失败，请确认后端已启动或日期范围是否正确");
     }
   }
 
@@ -950,6 +985,43 @@ export default function Home() {
           ))}
         </section>
       )}
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">导出消费记录</h2>
+
+      <section className="mt-4 flex max-w-md flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          开始日期
+          <input
+            type="date"
+            value={exportStartDate}
+            onChange={(e) => setExportStartDate(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          结束日期
+          <input
+            type="date"
+            value={exportEndDate}
+            onChange={(e) => setExportEndDate(e.target.value)}
+            className="rounded-lg border px-3 py-2"
+          />
+        </label>
+
+        {exportError && (
+          <p className="text-red-600 font-medium">{exportError}</p>
+        )}
+
+        <button
+          onClick={exportCsv}
+          className="mt-2 rounded-lg bg-black px-4 py-2 text-white"
+        >
+          导出 CSV
+        </button>
+      </section>
     </main>
   );
 }
