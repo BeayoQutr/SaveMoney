@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { API_BASE_URL } from "./lib/api";
 
 type PlanResult = {
@@ -245,6 +245,11 @@ export default function Home() {
   const [aiCategoryReason, setAiCategoryReason] = useState("");
   const [aiCategoryError, setAiCategoryError] = useState("");
   const [aiCategoryLoading, setAiCategoryLoading] = useState(false);
+  const lastAiCategoryResultRef = useRef<{
+    inputKey: string;
+    category: string;
+    reason: string;
+  } | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [backendStatusMessage, setBackendStatusMessage] = useState("");
 
@@ -488,6 +493,22 @@ export default function Home() {
       return;
     }
 
+    const inputKey = `${Number(expenseAmount)}::${expenseNote.trim()}`;
+
+    const cachedResult = lastAiCategoryResultRef.current;
+
+    if (
+      cachedResult &&
+      cachedResult.inputKey === inputKey &&
+      cachedResult.category &&
+      cachedResult.reason
+    ) {
+      setExpenseCategory(cachedResult.category);
+      setAiCategoryError("");
+      setAiCategoryReason(cachedResult.reason);
+      return;
+    }
+
     setAiCategoryLoading(true);
 
     try {
@@ -521,8 +542,13 @@ export default function Home() {
       }
 
       const data: AiSuggestCategoryResponse = await response.json();
+      lastAiCategoryResultRef.current = {
+        inputKey,
+        category: data.category,
+        reason: data.reason || "根据备注内容自动判断。",
+      };
       setExpenseCategory(data.category);
-      setAiCategoryReason(data.reason);
+      setAiCategoryReason(data.reason || "根据备注内容自动判断。");
     } catch {
       setAiCategoryError("AI 分类建议生成失败，请稍后重试");
     } finally {
@@ -604,6 +630,7 @@ export default function Home() {
       setExpenseCategory("");
       setAiCategoryReason("");
       setAiCategoryError("");
+      lastAiCategoryResultRef.current = null;
       fetchExpenses();
       fetchMonthlySummary();
       setAiMonthlyAdvice("");
@@ -950,6 +977,7 @@ export default function Home() {
               setExpenseCategory("");
               setAiCategoryReason("");
               setAiCategoryError("");
+              lastAiCategoryResultRef.current = null;
             }}
             className="rounded-lg border px-3 py-2"
             placeholder="例如 35"
@@ -966,6 +994,7 @@ export default function Home() {
               setExpenseCategory("");
               setAiCategoryReason("");
               setAiCategoryError("");
+              lastAiCategoryResultRef.current = null;
             }}
             className="rounded-lg border px-3 py-2"
             placeholder="例如 午餐"
@@ -982,6 +1011,7 @@ export default function Home() {
                 setExpenseCategory("");
                 setAiCategoryReason("");
                 setAiCategoryError("");
+                lastAiCategoryResultRef.current = null;
               }}
               className="rounded-lg border border-gray-600 px-2 py-0.5 text-xs text-gray-400 hover:text-white"
             >
