@@ -836,6 +836,19 @@ export default function Home() {
           />
         </label>
 
+        <div className="flex flex-wrap gap-1">
+          {["早餐", "午餐", "晚餐", "公交", "地铁", "学习", "买药", "购物"].map((label) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setExpenseNote(label)}
+              className="rounded-lg border border-gray-600 px-2 py-0.5 text-xs text-gray-400 hover:text-white"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <label className="flex flex-col gap-1 text-sm font-medium">
           消费日期
           <input
