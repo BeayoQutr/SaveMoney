@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { API_BASE_URL } from "./lib/api";
 
 type PlanResult = {
   remaining_days: number;
@@ -232,7 +233,7 @@ export default function Home() {
     setResult(null);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/plans/generate", {
+      const response = await fetch(`${API_BASE_URL}/plans/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -276,7 +277,7 @@ export default function Home() {
   const fetchExpenses = useCallback(async () => {
     setExpenseListError("");
     try {
-      const response = await fetch("http://127.0.0.1:8000/expenses");
+      const response = await fetch(`${API_BASE_URL}/expenses`);
       if (!response.ok) {
         throw new Error("请求失败");
       }
@@ -297,7 +298,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/plans/adjust", {
+      const response = await fetch(`${API_BASE_URL}/plans/adjust`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -327,7 +328,7 @@ export default function Home() {
     const today = getTodayLocalDateString();
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/expenses/summary/daily?query_date=${today}`
+        `${API_BASE_URL}/expenses/summary/daily?query_date=${today}`
       );
       if (!response.ok) {
         throw new Error("请求失败");
@@ -345,7 +346,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/expenses/summary/daily?query_date=${summaryDate}`
+        `${API_BASE_URL}/expenses/summary/daily?query_date=${summaryDate}`
       );
       if (!response.ok) {
         throw new Error("请求失败");
@@ -365,7 +366,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/expenses/summary/category?start_date=${start}&end_date=${end}`
+        `${API_BASE_URL}/expenses/summary/category?start_date=${start}&end_date=${end}`
       );
       if (!response.ok) {
         throw new Error("请求失败");
@@ -388,7 +389,7 @@ export default function Home() {
     try {
       const monthKey = getCurrentMonthStartDateString().substring(0, 7);
       const response = await fetch(
-        `http://127.0.0.1:8000/expenses/summary/monthly?month=${monthKey}`
+        `${API_BASE_URL}/expenses/summary/monthly?month=${monthKey}`
       );
       if (!response.ok) {
         throw new Error("请求失败");
@@ -413,7 +414,7 @@ export default function Home() {
     setExpenseResult(null);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/expenses", {
+      const response = await fetch(`${API_BASE_URL}/expenses`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -444,7 +445,7 @@ export default function Home() {
     if (!ok) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/expenses/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
@@ -474,7 +475,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/expenses/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -504,7 +505,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/expenses/export/csv?start_date=${exportStartDate}&end_date=${exportEndDate}`
+        `${API_BASE_URL}/expenses/export/csv?start_date=${exportStartDate}&end_date=${exportEndDate}`
       );
 
       if (!response.ok) {
