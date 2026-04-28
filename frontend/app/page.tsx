@@ -477,7 +477,12 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("请求失败");
+        if (response.status === 422) {
+          setExpenseError("记录失败，消费信息格式不正确");
+        } else {
+          setExpenseError("记录失败，请稍后重试");
+        }
+        return;
       }
 
       const data: ExpenseResult = await response.json();
