@@ -245,6 +245,8 @@ export default function Home() {
   const [aiCategoryReason, setAiCategoryReason] = useState("");
   const [aiCategoryError, setAiCategoryError] = useState("");
   const [aiCategoryLoading, setAiCategoryLoading] = useState(false);
+  const [aiNoteLoading, setAiNoteLoading] = useState(false);
+  const [aiNoteError, setAiNoteError] = useState("");
   const lastAiCategoryResultRef = useRef<{
     inputKey: string;
     category: string;
@@ -553,6 +555,48 @@ export default function Home() {
       setAiCategoryError("AI 分类建议生成失败，请稍后重试");
     } finally {
       setAiCategoryLoading(false);
+    }
+  }
+
+  async function optimizeExpenseNote() {
+    setAiNoteError("");
+    if (expenseNote.trim() === "") {
+      setAiNoteError("请先输入消费备注");
+      return;
+    }
+
+    setAiNoteLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/optimize-note`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          note: expenseNote,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 422) {
+          setAiNoteError("备注格式不正确");
+        } else if (response.status === 502) {
+          setAiNoteError("AI 服务暂时不可用，请稍后再试");
+        } else {
+          setAiNoteError("AI 优化失败，请稍后再试");
+        }
+        return;
+      }
+
+      const data = await response.json();
+      setExpenseNote(data.optimized_note);
+      setExpenseCategory("");
+      setAiCategoryReason("");
+      setAiCategoryError("");
+      lastAiCategoryResultRef.current = null;
+    } catch {
+      setAiNoteError("AI 优化失败，请确认后端已启动");
+    } finally {
+      setAiNoteLoading(false);
     }
   }
 
@@ -1000,6 +1044,21 @@ export default function Home() {
             placeholder="例如 午餐"
           />
         </label>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={optimizeExpenseNote}
+            disabled={aiNoteLoading}
+            className="rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-50"
+          >
+            {aiNoteLoading ? "优化中..." : "AI 优化备注"}
+          </button>
+        </div>
+
+        {aiNoteError && (
+          <p className="text-red-600 font-medium text-sm">{aiNoteError}</p>
+        )}
 
         <div className="flex flex-wrap gap-1">
           {["早餐", "午餐", "晚餐", "公交", "地铁", "学习", "买药", "购物"].map((label) => (
