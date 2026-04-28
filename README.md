@@ -1,88 +1,128 @@
-# SaveMoney AI 攒钱软件
+# SaveMoney
 
-## 这是什么
+一个用于攒钱计划生成、消费记录、消费分析和 AI 辅助记账的 Web 全栈项目。
 
-这是我做的一个攒钱和消费记录项目。输入月收入、固定支出、最低生活费、攒钱目标和截止日期，它会帮你算一下每天应该存多少钱、目标是否可行，然后你可以每天在上面记录开销、看统计、调计划。
-
-目前主要用于学习、展示和个人使用，代码放在 GitHub 上公开。
+这是我做的完整学习项目，从前端到后端到数据库到 AI 接入，涵盖了一个 Web 应用的各个环节。代码放在 GitHub 上公开，主要用于学习、展示和个人使用。
 
 ## 项目定位
 
-当前这个是 Web 全栈版，前端用 Next.js，后端用 FastAPI + SQLite。跑起来方便，适合在电脑上体验和调试。
+当前版本是 **Web 全栈版**，前端用 Next.js，后端用 FastAPI + SQLite，适合在电脑浏览器上使用和调试。
 
-它不是 Android APK 版本。如果后面想做手机 APP，我会单独开一个原生 Android 项目重新实现，这个仓库保持 Web 版本不做 APK 适配。
+这不是 Android APK 版本。如果后面想做手机 App，会单独开一个原生 Android 项目重新实现，本仓库保持 Web 版本。
+
+## 已完成功能
+
+- 攒钱计划生成（根据收入、支出、目标、截止日期计算每日存钱金额）
+- 常用信息保存（月收入、固定支出等存到浏览器 localStorage）
+- 消费记录入库（金额、备注、日期、分类写入数据库）
+- 消费记录列表展示（最近记录，含编辑和删除按钮）
+- 编辑消费记录
+- 删除消费记录
+- 每日消费汇总（按日期查询消费总额和笔数）
+- 消费分类统计（按日期范围统计各类别金额和笔数）
+- 本月总览（本月总消费、日均消费、分类明细）
+- 动态调整攒钱计划（已攒金额和今日消费动态调整每日需存）
+- CSV 导出消费记录
+- AI 月度消费分析（调用 DeepSeek 生成本月消费报告）
+- AI 消费分类建议（根据金额和备注自动推荐分类）
+- AI 分类结果入库（分类推荐结果随消费记录写入数据库）
+- AI 分类防重复请求（相同金额和备注不重复请求 AI）
+- AI 消费备注优化（优化消费备注文本，让记录更简洁规范）
+- 前后端分离架构
+- SQLite 本地数据库
+- DeepSeek API 接入
 
 ## 技术栈
 
-**前端**
-- Next.js
-- TypeScript
-- Tailwind CSS
+- **前端**：Next.js / React / TypeScript / Tailwind CSS
+- **后端**：FastAPI / Python
+- **数据库**：SQLite
+- **AI**：DeepSeek API
+- **版本管理**：Git / GitHub
 
-**后端**
-- Python FastAPI
-- SQLite
-- SQLAlchemy
-- Pydantic
+## 本地运行
 
-## 已实现功能
+前提：装好 Python 3.10+ 和 Node.js 18+。
 
-- 生成攒钱计划
-- 后端连接状态检测
-- 常用信息保存到 localStorage
-- 记录消费
-- 消费自动分类
-- 查询最近消费记录
-- 编辑消费记录
-- 删除消费记录
-- 每日消费汇总
-- 消费分类统计
-- 本月总览
-- 本月消费建议
-- 动态调整攒钱计划
-- CSV 导出
-- 数据存储说明
+### 1. 安装依赖
 
-## 本地怎么跑
+```bash
+# 后端依赖
+cd backend
+pip install -r requirements.txt
 
-前提：装好 Python 3.10+ 和 Node.js 18+，装好后端依赖（`backend/requirements.txt`）和前端依赖（`frontend/package.json`）。
+# 前端依赖
+cd frontend
+npm install
+```
 
-**启动后端**
+### 2. 配置环境变量
+
+在 `backend/` 目录下创建 `.env` 文件，内容参考 `backend/.env.example`：
+
+```
+DEEPSEEK_API_KEY=你的DeepSeek_API_Key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+没有配置 API Key 也可以正常使用攒钱计划、消费记录等基础功能，只是 AI 相关功能（AI 月度分析、AI 分类建议、AI 备注优化）会返回服务不可用。
+
+### 3. 启动后端
 
 ```bash
 cd backend
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload
+.\\.venv\\Scripts\\Activate.ps1   # Windows PowerShell
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-后端默认跑在 `http://127.0.0.1:8000`，接口文档在 `http://127.0.0.1:8000/docs`。
+后端跑在 `http://127.0.0.1:8000`，接口文档在 `http://127.0.0.1:8000/docs`。
 
-**启动前端**
+### 4. 启动前端
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-前端默认跑在 `http://localhost:3000`，启动后会自动连后端。
+前端跑在 `http://localhost:3000`，启动后自动连接后端。
 
-## 环境变量
+## 环境变量说明
 
-前端 API 地址写在 `frontend/app/lib/api.ts` 里，默认是 `http://127.0.0.1:8000`。如果想改后端地址，可以在前端目录下创建 `.env.local` 文件：
+| 变量 | 说明 | 位置 |
+|---|---|---|
+| `DEEPSEEK_API_KEY` | DeepSeek API Key，用于 AI 功能 | `backend/.env` |
+| `DEEPSEEK_BASE_URL` | DeepSeek API 地址 | `backend/.env` |
+| `DEEPSEEK_MODEL` | 使用的模型名称 | `backend/.env` |
+| `NEXT_PUBLIC_API_BASE_URL` | 前端连接的后端地址，默认 `http://127.0.0.1:8000` | `frontend/.env.local`（可选） |
 
-```
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-```
+请勿将真实 API Key 提交到 Git。`backend/.env` 已在 `.gitignore` 中。
 
-## 数据存储
+## 数据存储说明
 
-消费记录默认保存在本地 SQLite 数据库里，文件路径是 `backend/savemoney.db`。这个文件已经在 `.gitignore` 里了，不会上传到 GitHub。
+消费记录保存在本地 SQLite 数据库中，文件路径是 `backend/savemoney.db`。常用信息保存在浏览器的 localStorage 中。这两个存储位置都已在 `.gitignore` 中，不会上传到 GitHub。
+
+## 项目截图
+
+![攒钱计划](docs/images/home1.png)
+
+![记录消费](docs/images/home2.png)
+
+![消费记录列表](docs/images/home3.png)
+
+![AI 月度分析](docs/images/home4.png)
 
 ## 后续计划
 
-- 优化页面体验（尤其是手机上看起来怎么样）
-- 补充一些项目截图放到 README 里
-- 后续考虑单独做一个 Android 版本
+- 补充项目截图
+- 根据需要优化页面细节
+- 如果需要移动端，单独开发 Android 原生版
+
+## 注意事项
+
+- 本项目主要用于个人学习和作品展示
+- AI 结果仅作为辅助参考，不一定完全准确
+- 不要提交 `.env` 和真实 API Key
 
 ## 许可证
 
