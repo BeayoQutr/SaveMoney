@@ -568,7 +568,12 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        throw new Error("导出失败");
+        if (response.status === 422) {
+          setExportError("导出失败，日期格式不正确");
+        } else {
+          setExportError("导出失败，请稍后重试");
+        }
+        return;
       }
 
       const blob = await response.blob();
@@ -581,7 +586,7 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      setExportError("导出失败，请确认后端已启动或日期范围是否正确");
+      setExportError("导出失败，请确认后端已启动");
     }
   }
 
