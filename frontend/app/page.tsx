@@ -1272,6 +1272,11 @@ export default function Home() {
         <p>导出的 CSV 文件可作为消费记录备份。</p>
         <p>数据库文件已加入 .gitignore，不会提交到 Git。</p>
       </section>
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+      <p className="mt-4 max-w-md text-center text-xs text-gray-500">
+        作者：岁年
+      </p>
     </main>
   );
 }
