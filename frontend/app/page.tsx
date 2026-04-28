@@ -547,17 +547,19 @@ export default function Home() {
     }
   }
 
-  async function exportCsv() {
+  async function doExport(start: string, end: string) {
     setExportError("");
+    setExportStartDate(start);
+    setExportEndDate(end);
 
-    if (!exportStartDate || !exportEndDate) {
+    if (!start || !end) {
       setExportError("请选择开始日期和结束日期");
       return;
     }
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/expenses/export/csv?start_date=${exportStartDate}&end_date=${exportEndDate}`
+        `${API_BASE_URL}/expenses/export/csv?start_date=${start}&end_date=${end}`
       );
 
       if (!response.ok) {
@@ -568,7 +570,7 @@ export default function Home() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `expenses_${exportStartDate}_to_${exportEndDate}.csv`;
+      a.download = `expenses_${start}_to_${end}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -576,6 +578,10 @@ export default function Home() {
     } catch {
       setExportError("导出失败，请确认后端已启动或日期范围是否正确");
     }
+  }
+
+  async function exportCsv() {
+    await doExport(exportStartDate, exportEndDate);
   }
 
   return (
@@ -1189,6 +1195,31 @@ export default function Home() {
             className="rounded-lg border px-3 py-2"
           />
         </label>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() =>
+              doExport(
+                getTodayLocalDateString(),
+                getTodayLocalDateString()
+              )
+            }
+            className="rounded-lg border px-3 py-2 text-sm text-gray-400 hover:text-white"
+          >
+            导出今日
+          </button>
+          <button
+            onClick={() =>
+              doExport(
+                getCurrentMonthStartDateString(),
+                getTodayLocalDateString()
+              )
+            }
+            className="rounded-lg border px-3 py-2 text-sm text-gray-400 hover:text-white"
+          >
+            导出本月
+          </button>
+        </div>
 
         {exportError && (
           <p className="text-red-600 font-medium">{exportError}</p>
