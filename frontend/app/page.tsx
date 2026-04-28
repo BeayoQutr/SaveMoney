@@ -275,6 +275,19 @@ export default function Home() {
     }
   }
 
+  function clearPreset() {
+    try {
+      localStorage.removeItem("savemoney_preset");
+      setMonthlyIncome("");
+      setFixedExpenses("");
+      setMinimumLivingCost("");
+      setIdentity("student");
+      setSavePresetMessage("常用信息已清除");
+    } catch {
+      setSavePresetMessage("清除失败，请检查浏览器设置");
+    }
+  }
+
   const fetchExpenses = useCallback(async () => {
     setExpenseListError("");
     try {
@@ -611,12 +624,20 @@ export default function Home() {
           生成攒钱计划
         </button>
 
-        <button
-          onClick={savePreset}
-          className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-400 hover:text-white"
-        >
-          保存常用信息
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={savePreset}
+            className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-400 hover:text-white"
+          >
+            保存常用信息
+          </button>
+          <button
+            onClick={clearPreset}
+            className="rounded-lg border border-red-800 px-4 py-2 text-sm text-red-500 hover:bg-red-950"
+          >
+            清除常用信息
+          </button>
+        </div>
 
         {savePresetMessage && (
           <p
