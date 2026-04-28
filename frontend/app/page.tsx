@@ -194,7 +194,7 @@ export default function Home() {
 
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
-  const [expenseDate, setExpenseDate] = useState("");
+  const [expenseDate, setExpenseDate] = useState(getTodayLocalDateString());
   const [expenseResult, setExpenseResult] = useState<ExpenseResult | null>(null);
   const [expenseError, setExpenseError] = useState("");
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>([]);
