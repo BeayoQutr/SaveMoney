@@ -557,6 +557,11 @@ export default function Home() {
       return;
     }
 
+    if (start > end) {
+      setExportError("开始日期不能晚于结束日期");
+      return;
+    }
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/expenses/export/csv?start_date=${start}&end_date=${end}`
