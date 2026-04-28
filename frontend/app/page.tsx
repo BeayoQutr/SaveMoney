@@ -482,6 +482,8 @@ export default function Home() {
 
       const data: ExpenseResult = await response.json();
       setExpenseResult(data);
+      setExpenseAmount("");
+      setExpenseNote("");
       fetchExpenses();
       fetchMonthlySummary();
     } catch {
