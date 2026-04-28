@@ -228,6 +228,8 @@ export default function Home() {
   const [monthlyResult, setMonthlyResult] = useState<MonthlySummary | null>(null);
   const [monthlyError, setMonthlyError] = useState("");
   const [monthlyAdvice, setMonthlyAdvice] = useState<string[]>([]);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [backendStatusMessage, setBackendStatusMessage] = useState("");
 
   async function generatePlan() {
     setError("");
@@ -417,11 +419,32 @@ export default function Home() {
     }
   }
 
+  const checkBackend = useCallback(async () => {
+    setBackendOnline(null);
+    setBackendStatusMessage("正在检测后端连接…");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+
+      if (response.ok) {
+        setBackendOnline(true);
+        setBackendStatusMessage("后端已连接");
+      } else {
+        setBackendOnline(false);
+        setBackendStatusMessage("后端未响应，请确认已启动");
+      }
+    } catch {
+      setBackendOnline(false);
+      setBackendStatusMessage("后端未响应，请确认已启动");
+    }
+  }, []);
+
   useEffect(() => {
     /* eslint-disable */
     void fetchExpenses();
+    void checkBackend();
     /* eslint-enable */
-  }, []);
+  }, [checkBackend, fetchExpenses]);
 
   async function recordExpense() {
     setExpenseError("");
@@ -560,6 +583,29 @@ export default function Home() {
       <p className="mt-4 text-gray-600">
         AI 攒钱计划助手：根据收入、支出和目标生成每日存钱计划。
       </p>
+
+      {backendStatusMessage && (
+        <div className="mt-3 flex items-center gap-2">
+          <span
+            className={
+              backendOnline === true
+                ? "text-green-400"
+                : backendOnline === false
+                ? "text-red-500"
+                : "text-gray-400"
+            }
+          >
+            {backendOnline === true && "● "}
+            {backendStatusMessage}
+          </span>
+          <button
+            onClick={() => void checkBackend()}
+            className="rounded-lg border border-gray-600 px-2 py-0.5 text-xs text-gray-400 hover:text-white"
+          >
+            重新检测
+          </button>
+        </div>
+      )}
 
       <section className="mt-6 flex max-w-md flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm font-medium">
