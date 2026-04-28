@@ -1237,6 +1237,18 @@ export default function Home() {
           导出 CSV
         </button>
       </section>
+
+      <hr className="mt-8 max-w-md border-gray-700" />
+
+      <h2 className="mt-8 text-2xl font-bold">数据存储说明</h2>
+
+      <section className="mt-4 max-w-md text-sm text-gray-400 flex flex-col gap-2">
+        <p>消费记录保存在本地 SQLite 数据库中。</p>
+        <p>当前数据库文件位于 backend/savemoney.db。</p>
+        <p>常用信息（月收入、固定支出、最低生活费、身份）保存在浏览器 localStorage 中。</p>
+        <p>导出的 CSV 文件可作为消费记录备份。</p>
+        <p>数据库文件已加入 .gitignore，不会提交到 Git。</p>
+      </section>
     </main>
   );
 }
