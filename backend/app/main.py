@@ -17,6 +17,8 @@ from app.schemas import (
     AiMonthlyAdviceResponse,
     AiSuggestCategoryRequest,
     AiSuggestCategoryResponse,
+    AiOptimizeNoteRequest,
+    AiOptimizeNoteResponse,
 )
 from app.schemas import GeneratePlanRequest, GeneratePlanResponse
 from app.schemas import (
@@ -456,3 +458,58 @@ def ai_suggest_category(payload: AiSuggestCategoryRequest):
         reason = reason[:80]
 
     return AiSuggestCategoryResponse(category=category, reason=reason)
+
+
+@app.post("/ai/optimize-note", response_model=AiOptimizeNoteResponse)
+def ai_optimize_note(payload: AiOptimizeNoteRequest):
+    note = payload.note.strip()
+    if not note:
+        raise HTTPException(status_code=422, detail="备注不能为空")
+
+    system_prompt = (
+        "你是个人记账应用里的消费备注优化助手。"
+        "只把用户输入的消费备注改写成更清晰、简短、适合记账的中文备注。"
+        "不要改变消费事实。"
+        "不要编造金额、日期、地点、健康信息。"
+        "不要输出解释。"
+        "不要输出多句话。"
+        "不要超过 15 个中文字符。"
+        "必须返回 JSON。"
+    )
+
+    user_prompt = (
+        f"原始备注：{note}\n\n"
+        '请返回严格 JSON：\n'
+        '{\n'
+        '  "optimized_note": "优化后的备注"\n'
+        '}'
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    try:
+        raw = call_deepseek(messages, temperature=0.2, max_tokens=120)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError:
+        raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试")
+
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试")
+
+    optimized_note = data.get("optimized_note", "")
+    if not optimized_note:
+        raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试")
+
+    optimized_note = optimized_note.strip()
+
+    # Cap at roughly 20 Chinese characters
+    if len(optimized_note) > 20:
+        optimized_note = optimized_note[:20]
+
+    return AiOptimizeNoteResponse(optimized_note=optimized_note)

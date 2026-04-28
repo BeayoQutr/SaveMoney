@@ -110,3 +110,11 @@ class AiSuggestCategoryRequest(BaseModel):
 class AiSuggestCategoryResponse(BaseModel):
     category: str
     reason: str
+
+
+class AiOptimizeNoteRequest(BaseModel):
+    note: str
+
+
+class AiOptimizeNoteResponse(BaseModel):
+    optimized_note: str
