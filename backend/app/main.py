@@ -1,6 +1,7 @@
 import calendar
 import csv
 import io
+import json
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,12 @@ from typing import List
 
 from sqlalchemy import func
 
-from app.schemas import AiMonthlyAdviceResponse, GeneratePlanRequest, GeneratePlanResponse
+from app.schemas import (
+    AiMonthlyAdviceResponse,
+    AiSuggestCategoryRequest,
+    AiSuggestCategoryResponse,
+)
+from app.schemas import GeneratePlanRequest, GeneratePlanResponse
 from app.schemas import (
     ExpenseCreateRequest,
     ExpenseCreateResponse,
@@ -85,6 +91,24 @@ def classify_expense(note: str) -> str:
     if any(kw in note for kw in ["药", "医院"]):
         return "医疗"
     return "其他"
+
+
+AI_ALLOWED_CATEGORIES = [
+    "餐饮",
+    "交通",
+    "学习",
+    "娱乐",
+    "购物",
+    "医疗",
+    "生活",
+    "其他",
+]
+
+
+def normalize_expense_category(category: str | None, note: str) -> str:
+    if category and category in AI_ALLOWED_CATEGORIES:
+        return category
+    return classify_expense(note)
 
 
 @app.get("/expenses/summary/daily", response_model=DailyExpenseSummaryResponse)
@@ -203,7 +227,7 @@ def expenses_summary_monthly(month: str, db: Session = Depends(get_db)):
 
 @app.post("/expenses", response_model=ExpenseCreateResponse)
 def create_expense(data: ExpenseCreateRequest, db: Session = Depends(get_db)):
-    category = classify_expense(data.note)
+    category = normalize_expense_category(data.category, data.note)
     expense = Expense(
         amount=data.amount,
         note=data.note,
@@ -249,7 +273,7 @@ def update_expense(expense_id: int, data: ExpenseCreateRequest, db: Session = De
     expense.amount = data.amount
     expense.note = data.note
     expense.date = data.date
-    expense.category = classify_expense(data.note)
+    expense.category = normalize_expense_category(data.category, data.note)
 
     db.commit()
     db.refresh(expense)
@@ -370,3 +394,65 @@ def export_expenses_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.post("/ai/suggest-category", response_model=AiSuggestCategoryResponse)
+def ai_suggest_category(payload: AiSuggestCategoryRequest):
+    if payload.amount <= 0:
+        raise HTTPException(status_code=422, detail="金额必须大于 0")
+
+    note = payload.note.strip()
+    if not note:
+        raise HTTPException(status_code=422, detail="备注不能为空")
+
+    categories_text = "、".join(AI_ALLOWED_CATEGORIES)
+
+    system_prompt = (
+        "你是一个消费记账应用里的分类助手。"
+        "你只能从给定分类列表中选择一个分类。"
+        "不要编造新分类。"
+        "不要输出多余解释。"
+        "必须返回 JSON。"
+    )
+
+    user_prompt = (
+        f"消费金额：{payload.amount} 元\n"
+        f"消费备注：{note}\n"
+        f"可选分类：{categories_text}\n\n"
+        '请返回严格 JSON：\n'
+        '{\n'
+        '  "category": "分类名",\n'
+        '  "reason": "一句话理由"\n'
+        '}'
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    try:
+        raw = call_deepseek(messages, temperature=0.1, max_tokens=200)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError:
+        raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试")
+
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试")
+
+    category = data.get("category", "其他")
+    if category not in AI_ALLOWED_CATEGORIES:
+        category = "其他"
+
+    reason = data.get("reason", "")
+    if not reason:
+        reason = "根据备注内容自动判断。"
+
+    # Truncate reason to roughly 80 Chinese characters (240 bytes / 3)
+    if len(reason) > 80:
+        reason = reason[:80]
+
+    return AiSuggestCategoryResponse(category=category, reason=reason)

@@ -66,6 +66,11 @@ type AiMonthlyAdviceResponse = {
   advice: string;
 };
 
+type AiSuggestCategoryResponse = {
+  category: string;
+  reason: string;
+};
+
 function getTodayLocalDateString() {
   const now = new Date();
   const year = now.getFullYear();
@@ -200,6 +205,7 @@ export default function Home() {
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
   const [expenseDate, setExpenseDate] = useState(getTodayLocalDateString());
+  const [expenseCategory, setExpenseCategory] = useState("");
   const [expenseResult, setExpenseResult] = useState<ExpenseResult | null>(null);
   const [expenseError, setExpenseError] = useState("");
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>([]);
@@ -236,6 +242,9 @@ export default function Home() {
   const [aiMonthlyAdvice, setAiMonthlyAdvice] = useState("");
   const [aiMonthlyAdviceError, setAiMonthlyAdviceError] = useState("");
   const [aiMonthlyAdviceLoading, setAiMonthlyAdviceLoading] = useState(false);
+  const [aiCategoryReason, setAiCategoryReason] = useState("");
+  const [aiCategoryError, setAiCategoryError] = useState("");
+  const [aiCategoryLoading, setAiCategoryLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [backendStatusMessage, setBackendStatusMessage] = useState("");
 
@@ -465,6 +474,62 @@ export default function Home() {
     }
   }
 
+  async function suggestExpenseCategory() {
+    setAiCategoryReason("");
+    setAiCategoryError("");
+
+    const amountNum = Number(expenseAmount);
+    if (!expenseAmount || isNaN(amountNum) || amountNum <= 0) {
+      setAiCategoryError("请先输入有效金额");
+      return;
+    }
+    if (expenseNote.trim() === "") {
+      setAiCategoryError("请先输入消费备注");
+      return;
+    }
+
+    setAiCategoryLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/suggest-category`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: amountNum,
+          note: expenseNote.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 502) {
+          setAiCategoryError("AI 服务暂时不可用，请稍后再试");
+        } else if (response.status === 500) {
+          setAiCategoryError("AI 配置异常，请检查后端环境变量");
+        } else if (response.status === 422) {
+          try {
+            const errorData = await response.json();
+            setAiCategoryError(
+              errorData.detail || "金额或备注格式不正确"
+            );
+          } catch {
+            setAiCategoryError("金额或备注格式不正确");
+          }
+        } else {
+          setAiCategoryError("AI 分类建议生成失败，请稍后重试");
+        }
+        return;
+      }
+
+      const data: AiSuggestCategoryResponse = await response.json();
+      setExpenseCategory(data.category);
+      setAiCategoryReason(data.reason);
+    } catch {
+      setAiCategoryError("AI 分类建议生成失败，请稍后重试");
+    } finally {
+      setAiCategoryLoading(false);
+    }
+  }
+
   const checkBackend = useCallback(async () => {
     setBackendOnline(null);
     setBackendStatusMessage("正在检测后端连接…");
@@ -519,6 +584,7 @@ export default function Home() {
           amount: Number(expenseAmount),
           note: expenseNote,
           date: expenseDate,
+          category: expenseCategory || undefined,
         }),
       });
 
@@ -535,6 +601,9 @@ export default function Home() {
       setExpenseResult(data);
       setExpenseAmount("");
       setExpenseNote("");
+      setExpenseCategory("");
+      setAiCategoryReason("");
+      setAiCategoryError("");
       fetchExpenses();
       fetchMonthlySummary();
       setAiMonthlyAdvice("");
@@ -876,7 +945,12 @@ export default function Home() {
           <input
             type="number"
             value={expenseAmount}
-            onChange={(e) => setExpenseAmount(e.target.value)}
+            onChange={(e) => {
+              setExpenseAmount(e.target.value);
+              setExpenseCategory("");
+              setAiCategoryReason("");
+              setAiCategoryError("");
+            }}
             className="rounded-lg border px-3 py-2"
             placeholder="例如 35"
           />
@@ -887,7 +961,12 @@ export default function Home() {
           <input
             type="text"
             value={expenseNote}
-            onChange={(e) => setExpenseNote(e.target.value)}
+            onChange={(e) => {
+              setExpenseNote(e.target.value);
+              setExpenseCategory("");
+              setAiCategoryReason("");
+              setAiCategoryError("");
+            }}
             className="rounded-lg border px-3 py-2"
             placeholder="例如 午餐"
           />
@@ -898,13 +977,39 @@ export default function Home() {
             <button
               key={label}
               type="button"
-              onClick={() => setExpenseNote(label)}
+              onClick={() => {
+                setExpenseNote(label);
+                setExpenseCategory("");
+                setAiCategoryReason("");
+                setAiCategoryError("");
+              }}
               className="rounded-lg border border-gray-600 px-2 py-0.5 text-xs text-gray-400 hover:text-white"
             >
               {label}
             </button>
           ))}
         </div>
+
+        <button
+          type="button"
+          onClick={suggestExpenseCategory}
+          disabled={aiCategoryLoading}
+          className="rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-50"
+        >
+          {aiCategoryLoading ? "AI 判断中..." : "AI 建议分类"}
+        </button>
+
+        {expenseCategory && (
+          <p className="text-sm text-gray-400">当前分类：{expenseCategory}</p>
+        )}
+
+        {aiCategoryError && (
+          <p className="text-red-600 font-medium text-sm">{aiCategoryError}</p>
+        )}
+
+        {aiCategoryReason && (
+          <p className="text-xs text-gray-400">AI 建议：{aiCategoryReason}</p>
+        )}
 
         <label className="flex flex-col gap-1 text-sm font-medium">
           消费日期

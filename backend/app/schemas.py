@@ -28,6 +28,7 @@ class ExpenseCreateRequest(BaseModel):
     amount: float = Field(gt=0)
     note: str = Field(min_length=1)
     date: date
+    category: str | None = None
 
 
 class ExpenseCreateResponse(BaseModel):
@@ -99,3 +100,13 @@ class AiMonthlyAdviceResponse(BaseModel):
 class ExpenseDeleteResponse(BaseModel):
     message: str
     deleted_id: int
+
+
+class AiSuggestCategoryRequest(BaseModel):
+    amount: float
+    note: str
+
+
+class AiSuggestCategoryResponse(BaseModel):
+    category: str
+    reason: str
