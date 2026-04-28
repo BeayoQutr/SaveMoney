@@ -427,6 +427,19 @@ export default function Home() {
     setExpenseError("");
     setExpenseResult(null);
 
+    if (!expenseAmount || isNaN(Number(expenseAmount))) {
+      setExpenseError("请输入有效的消费金额");
+      return;
+    }
+    if (expenseNote.trim() === "") {
+      setExpenseError("请输入消费备注");
+      return;
+    }
+    if (!expenseDate) {
+      setExpenseError("请选择消费日期");
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/expenses`, {
         method: "POST",
