@@ -91,6 +91,11 @@ class MonthlyExpenseSummaryResponse(BaseModel):
     items: list[CategorySummaryItem]
 
 
+class AiMonthlyAdviceResponse(BaseModel):
+    month: str
+    advice: str
+
+
 class ExpenseDeleteResponse(BaseModel):
     message: str
     deleted_id: int

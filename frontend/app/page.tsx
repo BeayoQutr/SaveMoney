@@ -61,6 +61,11 @@ type MonthlySummary = {
   items: CategoryItem[];
 };
 
+type AiMonthlyAdviceResponse = {
+  month: string;
+  advice: string;
+};
+
 function getTodayLocalDateString() {
   const now = new Date();
   const year = now.getFullYear();
@@ -228,6 +233,9 @@ export default function Home() {
   const [monthlyResult, setMonthlyResult] = useState<MonthlySummary | null>(null);
   const [monthlyError, setMonthlyError] = useState("");
   const [monthlyAdvice, setMonthlyAdvice] = useState<string[]>([]);
+  const [aiMonthlyAdvice, setAiMonthlyAdvice] = useState("");
+  const [aiMonthlyAdviceError, setAiMonthlyAdviceError] = useState("");
+  const [aiMonthlyAdviceLoading, setAiMonthlyAdviceLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [backendStatusMessage, setBackendStatusMessage] = useState("");
 
@@ -419,6 +427,44 @@ export default function Home() {
     }
   }
 
+  async function fetchAiMonthlyAdvice() {
+    setAiMonthlyAdviceError("");
+    setAiMonthlyAdvice("");
+    setAiMonthlyAdviceLoading(true);
+
+    try {
+      const monthKey = getCurrentMonthStartDateString().substring(0, 7);
+      const response = await fetch(
+        `${API_BASE_URL}/ai/monthly-advice?month=${monthKey}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 502) {
+          setAiMonthlyAdviceError("AI 服务暂时不可用，请稍后再试");
+        } else if (response.status === 500) {
+          try {
+            const errorData = await response.json();
+            setAiMonthlyAdviceError(
+              errorData.detail || "AI 配置异常，请检查后端环境变量"
+            );
+          } catch {
+            setAiMonthlyAdviceError("AI 配置异常，请检查后端环境变量");
+          }
+        } else {
+          setAiMonthlyAdviceError("AI 消费分析生成失败，请稍后重试");
+        }
+        return;
+      }
+
+      const data: AiMonthlyAdviceResponse = await response.json();
+      setAiMonthlyAdvice(data.advice);
+    } catch {
+      setAiMonthlyAdviceError("AI 消费分析生成失败，请稍后重试");
+    } finally {
+      setAiMonthlyAdviceLoading(false);
+    }
+  }
+
   const checkBackend = useCallback(async () => {
     setBackendOnline(null);
     setBackendStatusMessage("正在检测后端连接…");
@@ -491,6 +537,8 @@ export default function Home() {
       setExpenseNote("");
       fetchExpenses();
       fetchMonthlySummary();
+      setAiMonthlyAdvice("");
+      setAiMonthlyAdviceError("");
     } catch {
       setExpenseError("记录失败，请确认后端已启动");
     }
@@ -510,6 +558,8 @@ export default function Home() {
       }
       fetchExpenses();
       fetchMonthlySummary();
+      setAiMonthlyAdvice("");
+      setAiMonthlyAdviceError("");
     } catch {
       setDeleteError("删除失败，请确认后端已启动或记录是否仍然存在");
     }
@@ -547,6 +597,8 @@ export default function Home() {
       setEditingId(null);
       fetchExpenses();
       fetchMonthlySummary();
+      setAiMonthlyAdvice("");
+      setAiMonthlyAdviceError("");
     } catch {
       setEditError("更新失败，请确认后端已启动或记录是否仍然存在");
     }
@@ -1022,6 +1074,25 @@ export default function Home() {
         >
           刷新本月总览
         </button>
+
+        <button
+          onClick={fetchAiMonthlyAdvice}
+          disabled={aiMonthlyAdviceLoading}
+          className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
+        >
+          {aiMonthlyAdviceLoading ? "AI 分析生成中..." : "生成 AI 消费分析"}
+        </button>
+
+        {aiMonthlyAdviceError && (
+          <p className="text-red-600 font-medium">{aiMonthlyAdviceError}</p>
+        )}
+
+        {aiMonthlyAdvice && (
+          <section className="rounded-xl border p-4">
+            <h3 className="font-semibold text-gray-400">AI 消费分析</h3>
+            <p className="mt-2 whitespace-pre-line text-sm">{aiMonthlyAdvice}</p>
+          </section>
+        )}
       </section>
 
       {monthlyError && (

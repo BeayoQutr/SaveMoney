@@ -12,7 +12,7 @@ from typing import List
 
 from sqlalchemy import func
 
-from app.schemas import GeneratePlanRequest, GeneratePlanResponse
+from app.schemas import AiMonthlyAdviceResponse, GeneratePlanRequest, GeneratePlanResponse
 from app.schemas import (
     ExpenseCreateRequest,
     ExpenseCreateResponse,
@@ -25,6 +25,7 @@ from app.schemas import (
     MonthlyExpenseSummaryResponse,
     ExpenseDeleteResponse,
 )
+from app.ai_client import call_deepseek
 from app.budget_engine import generate_saving_plan, adjust_saving_plan
 from app.database import engine, SessionLocal, Base
 from app.models import Expense
@@ -261,6 +262,86 @@ def update_expense(expense_id: int, data: ExpenseCreateRequest, db: Session = De
         category=expense.category,
         message="消费记录更新成功",
     )
+
+
+@app.get("/ai/monthly-advice", response_model=AiMonthlyAdviceResponse)
+def ai_monthly_advice(month: str, db: Session = Depends(get_db)):
+    try:
+        parsed = datetime.strptime(month + "-01", "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="month 格式错误，应为 YYYY-MM")
+
+    year = parsed.year
+    month_int = parsed.month
+    days_in_month = calendar.monthrange(year, month_int)[1]
+
+    start_date = date(year, month_int, 1)
+    end_date = date(year, month_int, days_in_month)
+
+    overall = (
+        db.query(
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.count(Expense.id),
+        )
+        .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .first()
+    )
+    total = round(float(overall[0]), 2)
+    count = int(overall[1])
+    average_daily = round(total / days_in_month, 2) if days_in_month > 0 else 0.0
+
+    if count == 0:
+        return AiMonthlyAdviceResponse(
+            month=month,
+            advice="这个月还没有消费记录，暂时无法生成 AI 消费分析。你可以先记录几笔消费后再试。",
+        )
+
+    rows = (
+        db.query(
+            Expense.category,
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.count(Expense.id),
+        )
+        .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .group_by(Expense.category)
+        .all()
+    )
+
+    category_lines = "\n".join(
+        f"- {row[0]}：{round(float(row[1]), 2)} 元（{int(row[2])} 笔）"
+        for row in rows
+    )
+
+    system_prompt = (
+        "你是一个个人攒钱和消费记录应用里的 AI 消费分析助手。"
+        "你要基于用户提供的消费统计数据，给出理性、克制、可执行的中文建议。"
+        "不要编造不存在的收入、目标金额或身体健康信息。"
+        "不要使用夸张语气。"
+        "不要输出医疗、投资、贷款建议。"
+    )
+
+    user_prompt = (
+        f"月份：{month}\n"
+        f"本月总消费：{total} 元\n"
+        f"消费笔数：{count} 笔\n"
+        f"日均消费：{average_daily} 元\n"
+        f"分类统计：\n{category_lines}\n\n"
+        "请先用 1 句话总结本月消费情况，再给 3 条具体建议。每条建议要短。不超过 300 字。"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    try:
+        advice = call_deepseek(messages, temperature=0.4, max_tokens=500)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError:
+        raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试")
+
+    return AiMonthlyAdviceResponse(month=month, advice=advice)
 
 
 @app.get("/expenses/export/csv")
