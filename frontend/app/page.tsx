@@ -218,6 +218,7 @@ export default function Home() {
   const [actualExpenseToday, setActualExpenseToday] = useState("");
   const [adjustResult, setAdjustResult] = useState<AdjustResult | null>(null);
   const [adjustError, setAdjustError] = useState("");
+  const [fillExpenseError, setFillExpenseError] = useState("");
 
   const [categoryStartDate, setCategoryStartDate] = useState("");
   const [categoryEndDate, setCategoryEndDate] = useState("");
@@ -336,7 +337,7 @@ export default function Home() {
       const data: DailySummary = await response.json();
       setActualExpenseToday(String(data.total_amount));
     } catch {
-      setAdjustError("自动读取今日消费失败");
+      setFillExpenseError("自动读取今日消费失败，请确认后端已启动");
     }
   }
 
@@ -374,7 +375,7 @@ export default function Home() {
       const data = await response.json();
       setCategoryResult(data.items);
     } catch {
-      setCategoryError("查询消费分类统计失败");
+      setCategoryError("查询消费分类统计失败，请确认后端已启动");
     }
   }
 
@@ -682,6 +683,10 @@ export default function Home() {
         >
           自动填入今日消费
         </button>
+
+        {fillExpenseError && (
+          <p className="text-red-600 font-medium">{fillExpenseError}</p>
+        )}
 
         <button
           onClick={adjustPlan}
