@@ -4,6 +4,26 @@
 
 当前版本是 **Web 全栈版**，前端使用 Next.js + React + TypeScript + Tailwind CSS，后端使用 FastAPI + SQLite + SQLAlchemy + Pydantic。项目适合在电脑和手机浏览器中使用，也适合作为完整 Web 全栈学习项目。
 
+## 演示
+
+<img src="docs/images/demo.gif" alt="SaveMoney 演示 GIF" width="760" />
+
+## 项目亮点
+
+- **完整个人记账闭环**：从攒钱计划、记账、统计、AI 辅助到备份恢复，覆盖个人使用的主流程。
+- **本地优先的数据策略**：默认使用 SQLite，本地运行成本低，备份文件可直接迁移。
+- **金额精度逐步治理**：API 保持“元”的易用接口，数据库内部逐步迁移为整数分，兼顾兼容性和精度。
+- **AI 非强依赖设计**：AI 未配置或服务失败时，核心记账能力不受影响。
+- **工程化可验证**：后端测试、前端 lint/build/test、GitHub Actions 和 Docker Compose 都已接入。
+
+## 技术难点
+
+- **旧库兼容迁移**：项目不要求用户手动重建数据库，启动时会补齐旧 SQLite 表结构并回填 cents 字段。
+- **备份恢复安全边界**：恢复前会校验上传文件是否为 SQLite、是否通过 `PRAGMA integrity_check`、是否包含 SaveMoney 核心表和字段。
+- **统一错误响应与前端兼容**：后端统一返回 `{ error: { code, message, details } }`，前端 API client 同时兼容旧版 `detail` 字段。
+- **前端无新增依赖测试**：少量前端单测使用 TypeScript 编译加 Node 内置 test runner，避免额外引入测试框架。
+- **容器化和本地开发并存**：Docker Compose 使用独立 SQLite 数据卷，同时保留原有本地 Python/Node 启动方式。
+
 ## 已完成功能
 
 - 快速记录消费：金额、备注、日期、分类、支付方式、必要性标记
@@ -19,11 +39,14 @@
 - 动态调整攒钱计划
 - 常用收入和支出信息保存到浏览器 localStorage
 - 数据库备份/恢复：一键下载数据库、从备份文件恢复、导入 CSV
+- 备份恢复前校验 SQLite 文件、核心 schema 和 integrity check
 - AI 月度消费分析（优雅降级：未配置 Key 时返回友好提示）
 - AI 消费分类建议，失败时回退本地规则
 - AI 消费备注优化（未配置 Key 时返回原始备注）
 - 可选 API 访问令牌认证
 - 后端接口回归测试
+- 少量前端 API client 单元测试
+- Docker Compose 一键启动
 - GitHub Actions 基础 CI
 
 ## 技术栈
@@ -101,6 +124,31 @@ SQLite
 
 前提：装好 Python 3.10+ 和 Node.js 18+。
 
+### Docker Compose 一键启动
+
+前提：装好 Docker Desktop 或 Docker Engine。
+
+```bash
+docker compose up --build
+```
+
+启动后访问：
+
+```text
+前端：http://localhost:3000
+后端：http://127.0.0.1:8000
+接口文档：http://127.0.0.1:8000/docs
+```
+
+Compose 默认把 SQLite 数据库保存到 `savemoney-data` volume。需要配置 AI 或访问令牌时，可在仓库根目录创建 `.env`：
+
+```text
+DEEPSEEK_API_KEY=
+SAVEMONEY_ACCESS_TOKEN=
+NEXT_PUBLIC_SAVEMONEY_ACCESS_TOKEN=
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
 ### 1. 安装依赖
 
 ```bash
@@ -171,6 +219,7 @@ python -m pytest tests
 # 前端检查
 cd frontend
 npm run lint
+npm test
 npm run build
 ```
 
@@ -211,7 +260,9 @@ npm run build
 - 后端启动时会自动补齐旧 SQLite 数据库缺失字段，并为旧消费记录和攒钱计划回填 cents 字段
 - 消费列表会校验日期范围、`limit` 和 `offset`，避免异常查询参数造成无效或过大的查询
 - 数据库备份会跟随 `SAVEMONEY_DATABASE_URL`，测试库或自定义数据库不会误指向默认库
+- 数据库恢复前会校验 SQLite 文件、核心 schema 和 `PRAGMA integrity_check`
 - 配置访问令牌时，前端数据库备份下载会通过标准 `Authorization` 请求头鉴权
+- 后端错误响应统一为 `{ error: { code, message, details } }`，前端 API client 统一读取错误信息
 - 所有查询参数使用 URLSearchParams 编码，避免特殊字符问题
 
 ## 金额精度说明
@@ -244,6 +295,8 @@ backend/savemoney.db
 - **下载数据库备份**：一键下载整个 SQLite 数据库文件
 - **从备份文件恢复**：上传 `.db` 文件覆盖当前数据库（自动备份旧库）
 - **导入 CSV**：上传消费记录 CSV 文件批量导入
+
+恢复数据库前，后端会先验证上传文件是否为可读取 SQLite、`PRAGMA integrity_check` 是否通过，以及是否包含 SaveMoney 所需的核心表和字段；校验通过后才会备份当前库并执行替换。
 
 如果启用了 `SAVEMONEY_ACCESS_TOKEN`，前端会在备份下载、恢复和导入请求中携带访问令牌。
 
@@ -289,22 +342,26 @@ AI 月度分析、AI 分类建议和 AI 备注优化需要在 `backend/.env` 配
 - [x] 给备份恢复、金额计算、AI 降级补测试
 - [x] 把消费和攒钱计划金额字段逐步迁移到整数分
 - [x] README 增加架构图和核心设计说明
+- [x] 备份恢复前校验 SQLite、schema 和 integrity check
+- [x] Docker Compose 一键启动
+- [x] 少量前端测试
+- [x] 统一错误响应格式
+- [x] README 增加项目亮点、技术难点、演示 GIF
 
 ### P1：项目成熟度提升
 
 - 引入 Alembic 管理数据库迁移
 - 把分类和支付方式配置化
 - 增加日志系统并统一日志格式
-- 统一错误响应格式
 - 前端继续补齐空状态、错误状态、加载状态
-- 补前端组件测试
+- 继续补前端组件测试
 
 ### P2：如果未来想部署或给别人用
 
 - 加入用户系统
 - 后端改成真正的鉴权授权模型
 - 备份接口单独保护
-- 增加生产环境 Docker Compose
+- 增强生产环境 Docker Compose，例如反向代理、HTTPS 和健康检查
 - 数据库从 SQLite 可选迁移到 PostgreSQL
 - 增加数据导入前预览和操作审计
 

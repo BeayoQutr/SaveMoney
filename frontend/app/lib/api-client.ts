@@ -14,6 +14,7 @@ import {
   PlanResult,
   SavingPlanCurrentResponse,
 } from "../types";
+import { getApiErrorMessage } from "./api-error";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -38,13 +39,9 @@ export class ApiError extends Error {
 async function readError(response: Response, fallback: string) {
   try {
     const data: unknown = await response.json();
-    if (
-      typeof data === "object" &&
-      data !== null &&
-      "detail" in data &&
-      typeof data.detail === "string"
-    ) {
-      return data.detail;
+    const message = getApiErrorMessage(data);
+    if (message) {
+      return message;
     }
   } catch {
     return fallback;

@@ -2,6 +2,12 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class ErrorResponse(BaseModel):
+    code: str
+    message: str
+    details: object | None = None
+
+
 class GeneratePlanRequest(BaseModel):
     monthly_income: float = Field(gt=0)
     fixed_expenses: float = Field(ge=0)
