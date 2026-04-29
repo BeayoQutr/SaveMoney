@@ -1,7 +1,6 @@
 from datetime import date
-from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -29,8 +28,8 @@ def list_expenses(
     end_date: date | None = None,
     category: str | None = None,
     keyword: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     return expense_service.list_expenses(

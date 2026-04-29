@@ -8,11 +8,10 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.models import Expense
+from app.database import SessionLocal
 from app.schemas import ExpenseCreateRequest
 from app.services.expense_service import create_expense
 from app.utils.backup_utils import create_backup, get_db_path, restore_from_file
-from app.database import SessionLocal
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -41,6 +40,7 @@ async def restore_db(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"自动备份失败: {e}")
 
     # Save uploaded file to a temp location
+    tmp_path: Path | None = None
     try:
         suffix = ".db"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -49,9 +49,11 @@ async def restore_db(file: UploadFile = File(...)):
             tmp_path = Path(tmp.name)
 
         restore_from_file(tmp_path)
-        tmp_path.unlink(missing_ok=True)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"恢复失败: {e}")
+    finally:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
     return {
         "message": "数据库恢复成功",
@@ -73,32 +75,33 @@ async def import_csv(file: UploadFile = File(...)):
         text = content.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(text))
 
-        db = SessionLocal()
         imported = 0
         errors = []
-        for i, row in enumerate(reader, start=1):
-            try:
-                amount = float(row.get("amount", 0))
-                note = row.get("note", "").strip()
-                expense_date = row.get("date", "").strip()
-                category = row.get("category", "").strip() or None
+        db = SessionLocal()
+        try:
+            for i, row in enumerate(reader, start=1):
+                try:
+                    amount = float(row.get("amount", 0))
+                    note = row.get("note", "").strip()
+                    expense_date = row.get("date", "").strip()
+                    category = row.get("category", "").strip() or None
 
-                if not note or amount <= 0 or not expense_date:
-                    errors.append(f"第{i}行: 数据不完整，跳过")
-                    continue
+                    if not note or amount <= 0 or not expense_date:
+                        errors.append(f"第{i}行: 数据不完整，跳过")
+                        continue
 
-                data = ExpenseCreateRequest(
-                    amount=amount,
-                    note=note,
-                    date=expense_date,
-                    category=category,
-                )
-                create_expense(db, data)
-                imported += 1
-            except Exception as e:
-                errors.append(f"第{i}行: {e}")
-
-        db.close()
+                    data = ExpenseCreateRequest(
+                        amount=amount,
+                        note=note,
+                        date=expense_date,
+                        category=category,
+                    )
+                    create_expense(db, data)
+                    imported += 1
+                except Exception as e:
+                    errors.append(f"第{i}行: {e}")
+        finally:
+            db.close()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"CSV 解析失败: {e}")
 

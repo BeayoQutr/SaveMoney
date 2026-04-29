@@ -8,7 +8,7 @@
 
 - 快速记录消费：金额、备注、日期、分类、支付方式、必要性标记
 - 消费记录列表展示、编辑、删除
-- 消费列表分页、日期筛选、分类筛选、关键词搜索
+- 消费列表分页、日期筛选、分类筛选、关键词搜索，并带服务端分页边界校验
 - 消费记录筛选面板自适应布局，窄屏和侧栏视图下日期输入不会被挤压
 - 每日消费汇总
 - 按日期范围统计消费分类
@@ -132,7 +132,7 @@ http://localhost:3000
 ```bash
 # 后端测试
 cd backend
-pytest
+python -m pytest tests
 
 # 前端检查
 cd frontend
@@ -173,14 +173,18 @@ npm run build
 - AI JSON 返回支持 Markdown 代码块容错解析
 - 生产环境不打印 API key 或完整 AI 响应
 - 金额处理集中封装为 Decimal 边界处理，避免到处直接操作 float
-- 后端启动时会自动补齐旧 SQLite 数据库缺失字段，避免存量空库或旧库查询时报错
+- 后端汇总接口使用数据库聚合和整数分字段计算，减少内存开销并降低浮点误差
+- 后端启动时会自动补齐旧 SQLite 数据库缺失字段，并为旧消费记录回填 `amount_cents`
+- 消费列表会校验日期范围、`limit` 和 `offset`，避免异常查询参数造成无效或过大的查询
+- 数据库备份会跟随 `SAVEMONEY_DATABASE_URL`，测试库或自定义数据库不会误指向默认库
+- 配置访问令牌时，前端数据库备份下载会通过标准 `Authorization` 请求头鉴权
 - 所有查询参数使用 URLSearchParams 编码，避免特殊字符问题
 
 ## 金额精度说明
 
 数据库同时保存 `amount`（浮点元）和 `amount_cents`（整数分）两个字段。新记录自动同步写入 `amount_cents`，API 继续对外接收和返回"元"。
 
-后端启动时会自动为旧版 SQLite 数据库补齐 `amount_cents`、`payment_method`、`is_necessary` 等兼容字段。存量数据也可通过迁移脚本手动补填：
+后端启动时会自动为旧版 SQLite 数据库补齐 `amount_cents`、`payment_method`、`is_necessary` 等兼容字段，并把旧记录的 `amount` 回填为整数分。存量数据也可通过迁移脚本手动补填：
 
 ```bash
 cd backend
@@ -195,6 +199,8 @@ python -m scripts.migrate_to_cents
 backend/savemoney.db
 ```
 
+如果设置了 `SAVEMONEY_DATABASE_URL`，后端和备份功能会使用该连接地址指向的 SQLite 文件。
+
 常用信息（月收入、固定支出、最低生活费、身份）保存在浏览器 localStorage 中。数据库文件和环境变量文件都已加入 `.gitignore`，不会提交到 GitHub。
 
 ### 备份功能
@@ -204,6 +210,8 @@ backend/savemoney.db
 - **下载数据库备份**：一键下载整个 SQLite 数据库文件
 - **从备份文件恢复**：上传 `.db` 文件覆盖当前数据库（自动备份旧库）
 - **导入 CSV**：上传消费记录 CSV 文件批量导入
+
+如果启用了 `SAVEMONEY_ACCESS_TOKEN`，前端会在备份下载、恢复和导入请求中携带访问令牌。
 
 **迁移或重装环境前，务必先下载数据库备份！**
 
