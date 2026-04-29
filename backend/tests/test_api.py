@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -23,11 +24,12 @@ class SaveMoneyApiTest(unittest.TestCase):
 
     def setUp(self) -> None:
         from app.database import SessionLocal
-        from app.models import Expense
+        from app.models import Expense, SavingPlan
 
         db = SessionLocal()
         try:
             db.query(Expense).delete()
+            db.query(SavingPlan).delete()
             db.commit()
         finally:
             db.close()
@@ -161,6 +163,86 @@ class SaveMoneyApiTest(unittest.TestCase):
 
         self.assertEqual(get_db_path(), self.db_path.resolve())
 
+    def test_restore_db_replaces_configured_sqlite_database(self) -> None:
+        from app.database import engine
+
+        original_backup = Path(self.temp_dir.name) / "original_before_restore.db"
+        restore_source = Path(self.temp_dir.name) / "restore_source.db"
+        shutil.copy2(self.db_path, original_backup)
+
+        connection = sqlite3.connect(restore_source)
+        try:
+            connection.execute("CREATE TABLE restored_marker (value TEXT NOT NULL)")
+            connection.execute("INSERT INTO restored_marker (value) VALUES ('ok')")
+            connection.commit()
+        finally:
+            connection.close()
+
+        try:
+            with restore_source.open("rb") as restore_file:
+                response = self.client.post(
+                    "/backup/restore-db",
+                    files={
+                        "file": (
+                            "restore_source.db",
+                            restore_file,
+                            "application/octet-stream",
+                        )
+                    },
+                )
+
+            self.assertEqual(response.status_code, 200)
+
+            restored = sqlite3.connect(self.db_path)
+            try:
+                marker = restored.execute(
+                    "SELECT value FROM restored_marker"
+                ).fetchone()
+            finally:
+                restored.close()
+            self.assertEqual(marker, ("ok",))
+        finally:
+            engine.dispose()
+            shutil.copy2(original_backup, self.db_path)
+
+    def test_saving_plan_money_fields_are_stored_as_cents(self) -> None:
+        from datetime import date, timedelta
+        from app.database import SessionLocal
+        from app.models import SavingPlan
+
+        response = self.client.post(
+            "/plans/generate",
+            json={
+                "monthly_income": 5000.12,
+                "fixed_expenses": 1000.34,
+                "target_amount": 1234.56,
+                "deadline": (date.today() + timedelta(days=60)).isoformat(),
+                "identity": "worker",
+                "minimum_living_cost": 999.99,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        db = SessionLocal()
+        try:
+            plan = db.query(SavingPlan).one()
+            self.assertEqual(plan.target_amount_cents, 123456)
+            self.assertEqual(plan.monthly_income_cents, 500012)
+            self.assertEqual(plan.fixed_expenses_cents, 100034)
+            self.assertEqual(plan.minimum_living_cost_cents, 99999)
+            self.assertEqual(plan.saved_amount_cents, 0)
+
+            update_response = self.client.put(
+                f"/plans/{plan.id}",
+                json={"saved_amount": 12.345},
+            )
+            self.assertEqual(update_response.status_code, 200)
+            db.refresh(plan)
+            self.assertEqual(plan.saved_amount_cents, 1235)
+            self.assertEqual(update_response.json()["saved_amount"], 12.35)
+        finally:
+            db.close()
+
     def test_ai_json_parser_accepts_fenced_json(self) -> None:
         from app.utils.ai_json import parse_ai_json_object
 
@@ -206,6 +288,38 @@ class SaveMoneyApiTest(unittest.TestCase):
         self.assertEqual(data["category"], "餐饮")
         self.assertIn("本地规则", data["reason"])
 
+    def test_ai_category_runtime_error_falls_back_to_local_rule(self) -> None:
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}), patch(
+            "app.services.ai_service.call_deepseek",
+            side_effect=RuntimeError("network down"),
+        ):
+            response = self.client.post(
+                "/ai/suggest-category",
+                json={"amount": 6, "note": "地铁"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["category"], "交通")
+        self.assertIn("本地规则", data["reason"])
+
+    def test_ai_monthly_advice_without_api_key_returns_friendly_message(self) -> None:
+        create_response = self.client.post(
+            "/expenses",
+            json={
+                "amount": 9.9,
+                "note": "午餐",
+                "date": "2026-04-11",
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}):
+            response = self.client.get("/ai/monthly-advice?month=2026-04")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("未配置 DeepSeek API Key", response.json()["advice"])
+
     def test_startup_migration_repairs_legacy_sqlite_expense_schema(self) -> None:
         from sqlalchemy import create_engine, text
         from app.db_migrations import ensure_sqlite_schema_compatibility
@@ -249,6 +363,76 @@ class SaveMoneyApiTest(unittest.TestCase):
             self.assertIn("payment_method", columns)
             self.assertIn("is_necessary", columns)
             self.assertEqual(cents, 1235)
+        finally:
+            engine.dispose()
+
+    def test_startup_migration_backfills_legacy_saving_plan_cents(self) -> None:
+        from sqlalchemy import create_engine, text
+        from app.db_migrations import ensure_sqlite_schema_compatibility
+
+        db_path = Path(self.temp_dir.name) / "legacy_plan_schema.db"
+        connection = sqlite3.connect(db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE saving_plans (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    target_amount FLOAT NOT NULL,
+                    deadline DATE NOT NULL,
+                    monthly_income FLOAT NOT NULL,
+                    fixed_expenses FLOAT NOT NULL,
+                    minimum_living_cost FLOAT NOT NULL,
+                    identity VARCHAR,
+                    saved_amount REAL NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    created_at DATETIME,
+                    updated_at DATETIME
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO saving_plans (
+                    target_amount,
+                    deadline,
+                    monthly_income,
+                    fixed_expenses,
+                    minimum_living_cost,
+                    saved_amount
+                )
+                VALUES (1234.56, '2026-06-01', 5000.12, 1000.34, 999.99, 12.345)
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+        try:
+            ensure_sqlite_schema_compatibility(engine)
+            with engine.connect() as conn:
+                rows = conn.execute(text("PRAGMA table_info(saving_plans)")).fetchall()
+                columns = {row[1] for row in rows}
+                cents = conn.execute(
+                    text(
+                        """
+                        SELECT
+                            target_amount_cents,
+                            monthly_income_cents,
+                            fixed_expenses_cents,
+                            minimum_living_cost_cents,
+                            saved_amount_cents
+                        FROM saving_plans
+                        """
+                    )
+                ).one()
+
+            self.assertIn("target_amount_cents", columns)
+            self.assertIn("monthly_income_cents", columns)
+            self.assertIn("fixed_expenses_cents", columns)
+            self.assertIn("minimum_living_cost_cents", columns)
+            self.assertIn("saved_amount_cents", columns)
+            self.assertEqual(tuple(cents), (123456, 500012, 100034, 99999, 1235))
         finally:
             engine.dispose()
 

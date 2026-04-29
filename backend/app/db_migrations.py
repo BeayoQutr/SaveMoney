@@ -9,6 +9,11 @@ SQLITE_COMPAT_COLUMNS: dict[str, list[tuple[str, str]]] = {
     ],
     "saving_plans": [
         ("saved_amount", "REAL NOT NULL DEFAULT 0"),
+        ("target_amount_cents", "INTEGER"),
+        ("monthly_income_cents", "INTEGER"),
+        ("fixed_expenses_cents", "INTEGER"),
+        ("minimum_living_cost_cents", "INTEGER"),
+        ("saved_amount_cents", "INTEGER"),
         ("status", "TEXT NOT NULL DEFAULT 'active'"),
         ("updated_at", "DATETIME"),
     ],
@@ -49,3 +54,25 @@ def ensure_sqlite_schema_compatibility(engine: Engine) -> None:
                     """
                 )
             )
+
+        plan_columns = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(saving_plans)")).fetchall()
+        }
+        plan_cent_columns = {
+            "target_amount": "target_amount_cents",
+            "monthly_income": "monthly_income_cents",
+            "fixed_expenses": "fixed_expenses_cents",
+            "minimum_living_cost": "minimum_living_cost_cents",
+            "saved_amount": "saved_amount_cents",
+        }
+        for yuan_column, cents_column in plan_cent_columns.items():
+            if {yuan_column, cents_column}.issubset(plan_columns):
+                conn.execute(
+                    text(
+                        f"""
+                        UPDATE saving_plans
+                        SET {cents_column} = CAST(ROUND({yuan_column} * 100) AS INTEGER)
+                        WHERE {cents_column} IS NULL AND {yuan_column} IS NOT NULL
+                        """
+                    )
+                )

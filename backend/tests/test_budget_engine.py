@@ -3,6 +3,7 @@ import unittest
 
 from app.budget_engine import adjust_saving_plan, generate_saving_plan
 from app.schemas import AdjustPlanRequest, GeneratePlanRequest
+from app.utils.money import from_cents, round_money, sum_money, to_cents
 
 
 class BudgetEngineTest(unittest.TestCase):
@@ -124,6 +125,28 @@ class BudgetEngineTest(unittest.TestCase):
         self.assertEqual(result.remaining_amount, 0)
         self.assertEqual(result.new_daily_saving, 0)
         self.assertEqual(result.status, "ok")
+
+    def test_money_helpers_use_decimal_half_up_rounding(self) -> None:
+        self.assertEqual(round_money(1.005), 1.01)
+        self.assertEqual(sum_money([0.1, 0.2]), 0.3)
+        self.assertEqual(to_cents(12.345), 1235)
+        self.assertEqual(from_cents(1235), 12.35)
+
+    def test_budget_engine_rounds_money_consistently(self) -> None:
+        result = generate_saving_plan(
+            GeneratePlanRequest(
+                monthly_income=3000.01,
+                fixed_expenses=1000.005,
+                target_amount=1000.005,
+                deadline=date.today() + timedelta(days=30),
+                identity="worker",
+                minimum_living_cost=500,
+            )
+        )
+
+        self.assertEqual(result.monthly_available, 2000.01)
+        self.assertEqual(result.target_amount, 1000.005)
+        self.assertEqual(result.daily_saving, 33.33)
 
 
 if __name__ == "__main__":

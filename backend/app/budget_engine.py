@@ -2,6 +2,7 @@ from datetime import date
 
 from app.schemas import GeneratePlanRequest, GeneratePlanResponse
 from app.schemas import AdjustPlanRequest, AdjustPlanResponse
+from app.utils.money import round_money
 
 
 def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
@@ -28,12 +29,12 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
         return GeneratePlanResponse(
             remaining_days=remaining_days,
             daily_saving=0,
-            monthly_available=round(monthly_available, 2),
+            monthly_available=round_money(monthly_available),
             daily_available=0,
             target_amount=data.target_amount,
             feasibility_score=0,
             minimum_living_cost=data.minimum_living_cost,
-            safe_saving_capacity=round(monthly_available - data.minimum_living_cost, 2),
+            safe_saving_capacity=round_money(monthly_available - data.minimum_living_cost),
             status="impossible",
             message="固定支出已经大于或等于收入，当前无法制定攒钱计划"
         )
@@ -44,18 +45,18 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
         return GeneratePlanResponse(
             remaining_days=remaining_days,
             daily_saving=0,
-            monthly_available=round(monthly_available, 2),
+            monthly_available=round_money(monthly_available),
             daily_available=0,
             target_amount=data.target_amount,
             feasibility_score=0,
             minimum_living_cost=data.minimum_living_cost,
-            safe_saving_capacity=round(safe_saving_capacity, 2),
+            safe_saving_capacity=round_money(safe_saving_capacity),
             status="impossible",
             message="扣除固定支出和最低生活费后，当前没有可用于攒钱的余额"
         )
 
-    daily_saving = round(data.target_amount / remaining_days, 2)
-    daily_available = round(safe_saving_capacity / 30, 2)
+    daily_saving = round_money(data.target_amount / remaining_days)
+    daily_available = round_money(safe_saving_capacity / 30)
 
     if daily_available <= 0:
         feasibility_score = 0
@@ -78,23 +79,23 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
     return GeneratePlanResponse(
         remaining_days=remaining_days,
         daily_saving=daily_saving,
-        monthly_available=round(monthly_available, 2),
+        monthly_available=round_money(monthly_available),
         daily_available=daily_available,
         target_amount=data.target_amount,
         feasibility_score=feasibility_score,
         minimum_living_cost=data.minimum_living_cost,
-        safe_saving_capacity=round(safe_saving_capacity, 2),
+        safe_saving_capacity=round_money(safe_saving_capacity),
         status=status,
         message=message
     )
 
 
 def adjust_saving_plan(data: AdjustPlanRequest) -> AdjustPlanResponse:
-    remaining_amount = round(max(data.target_amount - data.saved_amount, 0), 2)
+    remaining_amount = round_money(max(data.target_amount - data.saved_amount, 0))
 
     if remaining_amount <= 0:
         new_daily_saving = 0.0
-        adjustment_per_day = round(-data.planned_daily_saving, 2)
+        adjustment_per_day = round_money(-data.planned_daily_saving)
         return AdjustPlanResponse(
             remaining_amount=remaining_amount,
             today_gap=0.0,
@@ -105,11 +106,11 @@ def adjust_saving_plan(data: AdjustPlanRequest) -> AdjustPlanResponse:
         )
 
     actual_saving_today = max(data.daily_available - data.actual_expense_today, 0)
-    actual_saving_today = round(actual_saving_today, 2)
-    today_gap = round(data.planned_daily_saving - actual_saving_today, 2)
-    adjusted_remaining_amount = round(remaining_amount + today_gap, 2)
-    new_daily_saving = round(adjusted_remaining_amount / data.remaining_days, 2)
-    adjustment_per_day = round(new_daily_saving - data.planned_daily_saving, 2)
+    actual_saving_today = round_money(actual_saving_today)
+    today_gap = round_money(data.planned_daily_saving - actual_saving_today)
+    adjusted_remaining_amount = round_money(remaining_amount + today_gap)
+    new_daily_saving = round_money(adjusted_remaining_amount / data.remaining_days)
+    adjustment_per_day = round_money(new_daily_saving - data.planned_daily_saving)
 
     if new_daily_saving <= data.daily_available:
         status = "ok"

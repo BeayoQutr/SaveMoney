@@ -63,6 +63,40 @@ SaveMoney/
 └─ .github/workflows/ci.yml
 ```
 
+## 架构图
+
+```text
+Browser
+  │
+  │  Next.js / React UI
+  │  - 记账、统计、计划、备份面板
+  │  - 统一 API client 处理鉴权、JSON、文件上传和 Blob 下载
+  ▼
+FastAPI Backend
+  │
+  ├─ routers/      # HTTP 路由和请求参数校验
+  ├─ services/     # 业务规则：消费、计划、AI 降级
+  ├─ utils/        # 金额、日期、CSV、备份、AI JSON 解析
+  └─ auth.py       # 可选 Bearer Token
+  │
+  ├──────────────► DeepSeek API（可选）
+  │                  未配置或分类失败时走本地规则/友好降级
+  ▼
+SQLite
+  - 本地消费记录和攒钱计划
+  - 金额逐步迁移为整数分字段，API 对外仍使用元
+```
+
+## 核心设计说明
+
+- **API 边界保持简单**：前端和后端接口仍使用“元”为金额单位，避免 UI 和用户输入复杂化。
+- **数据库金额逐步整数化**：消费记录和攒钱计划都会同步保存浮点元字段与整数分字段；新计算优先使用整数分字段，旧字段保留用于兼容历史数据。
+- **启动兼容迁移**：后端启动时会为旧 SQLite 表补齐新增字段，并回填 cents 字段，降低本地项目升级成本。
+- **服务层承载业务规则**：routers 主要做 HTTP 参数接收，分类、汇总、计划持久化、AI 降级等逻辑集中在 services。
+- **AI 是增强能力，不是主链路依赖**：未配置 DeepSeek API Key 时，普通记账、统计、备份都正常可用；分类建议可回退本地规则。
+- **前端 API client 单入口**：`frontend/app/lib/api-client.ts` 统一处理 base URL、访问令牌、JSON 请求、文件上传和下载错误。
+- **备份按当前数据库配置执行**：设置 `SAVEMONEY_DATABASE_URL` 时，备份和恢复会作用于该 SQLite 文件，而不是固定默认路径。
+
 ## 本地运行
 
 前提：装好 Python 3.10+ 和 Node.js 18+。
@@ -165,7 +199,7 @@ npm run build
 - 后端 `main.py` 只负责创建 app、注册 CORS 和 routers
 - 后端业务逻辑拆分到 `routers/`、`services/`、`utils/`
 - 前端 `page.tsx` 只负责组合组件和页面级刷新状态
-- 前端类型、API 请求、localStorage 逻辑已独立封装
+- 前端类型、API 请求、文件上传下载、localStorage 逻辑已独立封装
 - 首屏优先展示"记一笔消费"，按钮和输入框适配移动端操作
 - 右侧消费列表和导出面板使用响应式宽度，避免日期、筛选项在侧栏中拥挤或截断
 - AI 功能全部优雅降级：未配置 Key 时返回友好提示而非 500 错误
@@ -174,7 +208,7 @@ npm run build
 - 生产环境不打印 API key 或完整 AI 响应
 - 金额处理集中封装为 Decimal 边界处理，避免到处直接操作 float
 - 后端汇总接口使用数据库聚合和整数分字段计算，减少内存开销并降低浮点误差
-- 后端启动时会自动补齐旧 SQLite 数据库缺失字段，并为旧消费记录回填 `amount_cents`
+- 后端启动时会自动补齐旧 SQLite 数据库缺失字段，并为旧消费记录和攒钱计划回填 cents 字段
 - 消费列表会校验日期范围、`limit` 和 `offset`，避免异常查询参数造成无效或过大的查询
 - 数据库备份会跟随 `SAVEMONEY_DATABASE_URL`，测试库或自定义数据库不会误指向默认库
 - 配置访问令牌时，前端数据库备份下载会通过标准 `Authorization` 请求头鉴权
@@ -182,9 +216,9 @@ npm run build
 
 ## 金额精度说明
 
-数据库同时保存 `amount`（浮点元）和 `amount_cents`（整数分）两个字段。新记录自动同步写入 `amount_cents`，API 继续对外接收和返回"元"。
+消费记录同时保存 `amount`（浮点元）和 `amount_cents`（整数分）两个字段。攒钱计划也会保存 `target_amount_cents`、`monthly_income_cents`、`fixed_expenses_cents`、`minimum_living_cost_cents`、`saved_amount_cents`。API 继续对外接收和返回"元"，数据库和汇总计算逐步优先使用"分"。
 
-后端启动时会自动为旧版 SQLite 数据库补齐 `amount_cents`、`payment_method`、`is_necessary` 等兼容字段，并把旧记录的 `amount` 回填为整数分。存量数据也可通过迁移脚本手动补填：
+后端启动时会自动为旧版 SQLite 数据库补齐 `amount_cents`、`payment_method`、`is_necessary` 和计划表 cents 字段，并把旧记录的元字段回填为整数分。存量数据也可通过迁移脚本手动补填：
 
 ```bash
 cd backend
@@ -249,10 +283,30 @@ AI 月度分析、AI 分类建议和 AI 备注优化需要在 `backend/.env` 配
 
 ## 后续计划
 
-- 继续增强预算分析维度
-- 增加前端组件测试
-- 增加标签（tags）功能
-- 如果需要移动端，单独开发 Android 原生版
+### P0：马上值得做
+
+- [x] 统一前端 API client
+- [x] 给备份恢复、金额计算、AI 降级补测试
+- [x] 把消费和攒钱计划金额字段逐步迁移到整数分
+- [x] README 增加架构图和核心设计说明
+
+### P1：项目成熟度提升
+
+- 引入 Alembic 管理数据库迁移
+- 把分类和支付方式配置化
+- 增加日志系统并统一日志格式
+- 统一错误响应格式
+- 前端继续补齐空状态、错误状态、加载状态
+- 补前端组件测试
+
+### P2：如果未来想部署或给别人用
+
+- 加入用户系统
+- 后端改成真正的鉴权授权模型
+- 备份接口单独保护
+- 增加生产环境 Docker Compose
+- 数据库从 SQLite 可选迁移到 PostgreSQL
+- 增加数据导入前预览和操作审计
 
 ## 注意事项
 
