@@ -14,7 +14,9 @@ import {
   PlanResult,
   SavingPlanCurrentResponse,
 } from "../types";
-import { API_BASE_URL } from "./api";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 function getAuthHeaders(): Record<string, string> {
   const token = process.env.NEXT_PUBLIC_SAVEMONEY_ACCESS_TOKEN;
@@ -50,7 +52,11 @@ async function readError(response: Response, fallback: string) {
   return fallback;
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit,
+  fallback = "请求失败"
+): Promise<T> {
   const authHeaders = getAuthHeaders();
   const mergedInit: RequestInit = {
     ...init,
@@ -61,9 +67,37 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   };
   const response = await fetch(`${API_BASE_URL}${path}`, mergedInit);
   if (!response.ok) {
-    throw new ApiError(await readError(response, "请求失败"), response.status);
+    throw new ApiError(await readError(response, fallback), response.status);
   }
   return response.json() as Promise<T>;
+}
+
+async function requestBlob(path: string, fallback: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new ApiError(await readError(response, fallback), response.status);
+  }
+  return response.blob();
+}
+
+async function uploadJson<T>(
+  path: string,
+  fileField: string,
+  file: File,
+  fallback: string
+): Promise<T> {
+  const formData = new FormData();
+  formData.append(fileField, file);
+  return requestJson<T>(
+    path,
+    {
+      method: "POST",
+      body: formData,
+    },
+    fallback
+  );
 }
 
 export const apiClient = {
@@ -167,14 +201,7 @@ export const apiClient = {
     });
   },
   async downloadDbBackup() {
-    const response = await fetch(`${API_BASE_URL}/backup/download-db`, {
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) {
-      throw new ApiError(await readError(response, "数据库下载失败"), response.status);
-    }
-
-    const blob = await response.blob();
+    const blob = await requestBlob("/backup/download-db", "数据库下载失败");
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = objectUrl;
@@ -186,47 +213,25 @@ export const apiClient = {
   },
 
   async restoreDb(file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await fetch(`${API_BASE_URL}/backup/restore-db`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: formData,
-    });
-    if (!response.ok) {
-      throw new ApiError(await readError(response, "数据库恢复失败"), response.status);
-    }
-    return response.json() as Promise<{ message: string; backup_path: string }>;
+    return uploadJson<{ message: string; backup_path: string }>(
+      "/backup/restore-db",
+      "file",
+      file,
+      "数据库恢复失败"
+    );
   },
 
   async importCsv(file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await fetch(`${API_BASE_URL}/backup/import-csv`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: formData,
-    });
-    if (!response.ok) {
-      throw new ApiError(await readError(response, "CSV 导入失败"), response.status);
-    }
-    return response.json() as Promise<{
+    return uploadJson<{
       message: string;
       imported: number;
       errors: string[];
       backup_path: string;
-    }>;
+    }>("/backup/import-csv", "file", file, "CSV 导入失败");
   },
 
   async exportExpensesCsv(startDate: string, endDate: string) {
     const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
-    const response = await fetch(
-      `${API_BASE_URL}/expenses/export/csv?${params.toString()}`,
-      { headers: getAuthHeaders() }
-    );
-    if (!response.ok) {
-      throw new ApiError(await readError(response, "导出失败"), response.status);
-    }
-    return response.blob();
+    return requestBlob(`/expenses/export/csv?${params.toString()}`, "导出失败");
   },
 };

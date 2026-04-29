@@ -12,24 +12,59 @@ from app.schemas import (
     SavingPlanItemResponse,
 )
 from app.budget_engine import generate_saving_plan
+from app.utils.money import from_cents, round_money, to_cents
+
+
+def _money_from_plan(plan: SavingPlan, yuan_attr: str, cents_attr: str) -> float:
+    cents = getattr(plan, cents_attr)
+    if cents is not None:
+        return from_cents(cents)
+    return round_money(getattr(plan, yuan_attr))
+
+
+def _plan_response(plan: SavingPlan) -> SavingPlanItemResponse:
+    return SavingPlanItemResponse(
+        id=plan.id,
+        target_amount=_money_from_plan(plan, "target_amount", "target_amount_cents"),
+        deadline=plan.deadline,
+        monthly_income=_money_from_plan(plan, "monthly_income", "monthly_income_cents"),
+        fixed_expenses=_money_from_plan(plan, "fixed_expenses", "fixed_expenses_cents"),
+        minimum_living_cost=_money_from_plan(
+            plan,
+            "minimum_living_cost",
+            "minimum_living_cost_cents",
+        ),
+        identity=plan.identity,
+        saved_amount=_money_from_plan(plan, "saved_amount", "saved_amount_cents"),
+        status=plan.status,
+    )
 
 
 def generate_and_save_plan(db: Session, data: GeneratePlanRequest) -> SavingPlanItemResponse:
     """Generate a saving plan and persist it to the database."""
+    target_amount = round_money(data.target_amount)
+    monthly_income = round_money(data.monthly_income)
+    fixed_expenses = round_money(data.fixed_expenses)
+    minimum_living_cost = round_money(data.minimum_living_cost)
     plan = SavingPlan(
-        target_amount=data.target_amount,
+        target_amount=target_amount,
+        target_amount_cents=to_cents(target_amount),
         deadline=data.deadline,
-        monthly_income=data.monthly_income,
-        fixed_expenses=data.fixed_expenses,
-        minimum_living_cost=data.minimum_living_cost,
+        monthly_income=monthly_income,
+        monthly_income_cents=to_cents(monthly_income),
+        fixed_expenses=fixed_expenses,
+        fixed_expenses_cents=to_cents(fixed_expenses),
+        minimum_living_cost=minimum_living_cost,
+        minimum_living_cost_cents=to_cents(minimum_living_cost),
         identity=data.identity,
         saved_amount=0.0,
+        saved_amount_cents=0,
         status="active",
     )
     db.add(plan)
     db.commit()
     db.refresh(plan)
-    return SavingPlanItemResponse.model_validate(plan)
+    return _plan_response(plan)
 
 
 def get_current_plan(db: Session) -> SavingPlanCurrentResponse:
@@ -48,15 +83,25 @@ def get_current_plan(db: Session) -> SavingPlanCurrentResponse:
     if remaining_days <= 0:
         remaining_days = 0
 
-    remaining_amount = max(plan.target_amount - plan.saved_amount, 0)
-    daily_saving = round(remaining_amount / remaining_days, 2) if remaining_days > 0 else 0.0
+    target_amount = _money_from_plan(plan, "target_amount", "target_amount_cents")
+    monthly_income = _money_from_plan(plan, "monthly_income", "monthly_income_cents")
+    fixed_expenses = _money_from_plan(plan, "fixed_expenses", "fixed_expenses_cents")
+    minimum_living_cost = _money_from_plan(
+        plan,
+        "minimum_living_cost",
+        "minimum_living_cost_cents",
+    )
+    saved_amount = _money_from_plan(plan, "saved_amount", "saved_amount_cents")
 
-    monthly_available = plan.monthly_income - plan.fixed_expenses
-    safe_capacity = monthly_available - plan.minimum_living_cost
-    daily_available = round(safe_capacity / 30, 2) if safe_capacity > 0 else 0.0
+    remaining_amount = max(target_amount - saved_amount, 0)
+    daily_saving = round_money(remaining_amount / remaining_days) if remaining_days > 0 else 0.0
+
+    monthly_available = monthly_income - fixed_expenses
+    safe_capacity = monthly_available - minimum_living_cost
+    daily_available = round_money(safe_capacity / 30) if safe_capacity > 0 else 0.0
 
     return SavingPlanCurrentResponse(
-        plan=SavingPlanItemResponse.model_validate(plan),
+        plan=_plan_response(plan),
         daily_saving=daily_saving,
         daily_available=daily_available,
         remaining_days=remaining_days,
@@ -70,9 +115,12 @@ def update_saved_amount(db: Session, plan_id: int, saved_amount: float) -> Savin
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="攒钱计划不存在")
 
+    saved_amount = round_money(saved_amount)
     plan.saved_amount = saved_amount
-    if saved_amount >= plan.target_amount:
+    plan.saved_amount_cents = to_cents(saved_amount)
+    target_amount = _money_from_plan(plan, "target_amount", "target_amount_cents")
+    if saved_amount >= target_amount:
         plan.status = "completed"
     db.commit()
     db.refresh(plan)
-    return SavingPlanItemResponse.model_validate(plan)
+    return _plan_response(plan)
