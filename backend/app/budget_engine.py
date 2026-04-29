@@ -90,7 +90,7 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
 
 
 def adjust_saving_plan(data: AdjustPlanRequest) -> AdjustPlanResponse:
-    remaining_amount = round(data.target_amount - data.saved_amount, 2)
+    remaining_amount = round(max(data.target_amount - data.saved_amount, 0), 2)
 
     if remaining_amount <= 0:
         new_daily_saving = 0.0

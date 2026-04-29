@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 
 import httpx
@@ -6,6 +7,8 @@ from dotenv import load_dotenv
 
 env_path = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=env_path)
+
+logger = logging.getLogger(__name__)
 
 
 def call_deepseek(
@@ -42,29 +45,15 @@ def call_deepseek(
         data = response.json()
         return data["choices"][0]["message"]["content"]
     except httpx.HTTPStatusError as e:
-        print("[DeepSeek Debug] URL:", request_url)
-        print("[DeepSeek Debug] model:", model)
-        print("[DeepSeek Debug] status_code:", e.response.status_code)
-        print(
-            "[DeepSeek Debug] response_text:",
-            e.response.text[:1000] if e.response.text else "(empty)",
+        logger.warning(
+            "DeepSeek HTTP error status=%s model=%s",
+            e.response.status_code,
+            model,
         )
         raise RuntimeError("DeepSeek API 调用失败") from e
     except httpx.RequestError as e:
-        print("[DeepSeek Debug] URL:", request_url)
-        print("[DeepSeek Debug] model:", model)
-        print("[DeepSeek Debug] exception_type:", type(e).__name__)
-        print("[DeepSeek Debug] exception:", str(e))
+        logger.warning("DeepSeek request error type=%s model=%s", type(e).__name__, model)
         raise RuntimeError("DeepSeek API 调用失败") from e
     except (KeyError, IndexError) as e:
-        print("[DeepSeek Debug] URL:", request_url)
-        print("[DeepSeek Debug] model:", model)
-        print("[DeepSeek Debug] response_status:", response.status_code)
-        try:
-            raw_text = response.text[:1000] if response.text else "(empty)"
-        except Exception:
-            raw_text = "(unavailable)"
-        print("[DeepSeek Debug] response_text:", raw_text)
-        print("[DeepSeek Debug] exception_type:", type(e).__name__)
-        print("[DeepSeek Debug] exception:", str(e))
+        logger.warning("DeepSeek response shape error type=%s model=%s", type(e).__name__, model)
         raise RuntimeError("DeepSeek API 调用失败") from e

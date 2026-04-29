@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -17,6 +18,17 @@ class SaveMoneyApiTest(unittest.TestCase):
         from app.main import app
 
         cls.client = TestClient(app)
+
+    def setUp(self) -> None:
+        from app.database import SessionLocal
+        from app.models import Expense
+
+        db = SessionLocal()
+        try:
+            db.query(Expense).delete()
+            db.commit()
+        finally:
+            db.close()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -69,6 +81,52 @@ class SaveMoneyApiTest(unittest.TestCase):
         second_delete_response = self.client.delete(f"/expenses/{created['id']}")
         self.assertEqual(second_delete_response.status_code, 404)
 
+    def test_expense_summaries_and_csv_export(self) -> None:
+        first = self.client.post(
+            "/expenses",
+            json={
+                "amount": 10.1,
+                "note": "午餐",
+                "date": "2026-04-10",
+                "category": "餐饮",
+            },
+        )
+        second = self.client.post(
+            "/expenses",
+            json={
+                "amount": 2.35,
+                "note": "公交",
+                "date": "2026-04-10",
+                "category": "交通",
+            },
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+
+        daily = self.client.get("/expenses/summary/daily?query_date=2026-04-10")
+        self.assertEqual(daily.status_code, 200)
+        self.assertEqual(daily.json()["total_amount"], 12.45)
+        self.assertEqual(daily.json()["count"], 2)
+
+        category = self.client.get(
+            "/expenses/summary/category?start_date=2026-04-01&end_date=2026-04-30"
+        )
+        self.assertEqual(category.status_code, 200)
+        items = {item["category"]: item for item in category.json()["items"]}
+        self.assertEqual(items["餐饮"]["total_amount"], 10.1)
+        self.assertEqual(items["交通"]["total_amount"], 2.35)
+
+        monthly = self.client.get("/expenses/summary/monthly?month=2026-04")
+        self.assertEqual(monthly.status_code, 200)
+        self.assertGreaterEqual(monthly.json()["total_amount"], 12.45)
+
+        csv_response = self.client.get(
+            "/expenses/export/csv?start_date=2026-04-01&end_date=2026-04-30"
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn("text/csv", csv_response.headers["content-type"])
+        self.assertIn("午餐", csv_response.text)
+
     def test_date_ranges_must_be_ordered(self) -> None:
         category_response = self.client.get(
             "/expenses/summary/category?start_date=2026-04-30&end_date=2026-04-01"
@@ -85,7 +143,7 @@ class SaveMoneyApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     def test_ai_json_parser_accepts_fenced_json(self) -> None:
-        from app.main import parse_ai_json_object
+        from app.utils.ai_json import parse_ai_json_object
 
         parsed = parse_ai_json_object(
             '```json\n{"category": "餐饮", "reason": "备注包含午餐"}\n```'
@@ -95,10 +153,39 @@ class SaveMoneyApiTest(unittest.TestCase):
         self.assertEqual(parsed["reason"], "备注包含午餐")
 
     def test_ai_json_parser_rejects_non_json(self) -> None:
-        from app.main import parse_ai_json_object
+        from app.utils.ai_json import parse_ai_json_object
 
         with self.assertRaises(HTTPException):
             parse_ai_json_object("无法分类")
+
+    def test_ai_without_api_key_returns_clear_error(self) -> None:
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}):
+            response = self.client.post("/ai/optimize-note", json={"note": " 午餐 "})
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("DEEPSEEK_API_KEY", response.json()["detail"])
+
+        create_response = self.client.post(
+            "/expenses",
+            json={
+                "amount": 8.8,
+                "note": "早餐",
+                "date": "2026-04-11",
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+
+    def test_ai_category_without_api_key_falls_back_to_local_rule(self) -> None:
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}):
+            response = self.client.post(
+                "/ai/suggest-category",
+                json={"amount": 15, "note": "午餐"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["category"], "餐饮")
+        self.assertIn("本地规则", data["reason"])
 
 
 if __name__ == "__main__":

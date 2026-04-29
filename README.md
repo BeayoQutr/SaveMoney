@@ -21,16 +21,6 @@
 - 后端接口回归测试
 - GitHub Actions 基础 CI
 
-## Bug 修复记录
-
-### v0.1.x (2026-04-29)
-
-| # | 严重程度 | 文件 | 问题描述 |
-|---|----------|------|----------|
-| 1 | 🟡 中 | `backend/app/budget_engine.py` | `adjust_saving_plan` 在 `saved_amount >= target_amount` 时未做边界保护，可能生成负数每日储蓄值 → 已增加提前返回逻辑 |
-| 2 | 🟡 中 | `backend/app/services/ai_service.py` | `optimize_note` 未捕获 `parse_ai_json_object` 抛出的 `HTTPException`，与 `suggest_category` 行为不一致 → 已统一异常处理 |
-| 3 | 🟠 低 | `backend/tests/__init__.py` | 测试包缺少 `__init__.py`，导致 `unittest` 无法发现测试用例 → 已补充 |
-
 ## 技术栈
 
 - **前端**：Next.js / React / TypeScript / Tailwind CSS
