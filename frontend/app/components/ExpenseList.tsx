@@ -162,7 +162,7 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
       </div>
 
       {/* Filter bar */}
-      <div className="mt-4 grid gap-3 rounded-lg border border-gray-800 bg-gray-950 p-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-3 rounded-lg border border-gray-800 bg-gray-950 p-3 sm:grid-cols-2">
         <label className="grid min-w-0 gap-1 text-sm">
           开始日期
           <input
@@ -196,7 +196,7 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
             ))}
           </select>
         </label>
-        <label className="grid min-w-0 gap-1 text-sm">
+        <label className="grid min-w-0 gap-1 text-sm sm:col-span-2">
           关键词搜索
           <input
             type="text"
@@ -206,7 +206,7 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
             placeholder="输入备注关键词"
           />
         </label>
-        <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-4">
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
           <button
             type="button"
             onClick={applyFilters}
