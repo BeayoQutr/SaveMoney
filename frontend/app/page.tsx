@@ -621,10 +621,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    /* eslint-disable */
-    void fetchExpenses();
-    void checkBackend();
-    /* eslint-enable */
+    void Promise.resolve().then(() => {
+      void fetchExpenses();
+      void checkBackend();
+    });
   }, [checkBackend, fetchExpenses]);
 
   async function recordExpense() {

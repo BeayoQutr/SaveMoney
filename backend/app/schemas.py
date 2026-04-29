@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class GeneratePlanRequest(BaseModel):
@@ -26,9 +26,25 @@ class GeneratePlanResponse(BaseModel):
 
 class ExpenseCreateRequest(BaseModel):
     amount: float = Field(gt=0)
-    note: str = Field(min_length=1)
+    note: str = Field(min_length=1, max_length=100)
     date: date
-    category: str | None = None
+    category: str | None = Field(default=None, max_length=20)
+
+    @field_validator("note")
+    @classmethod
+    def strip_note(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("备注不能为空")
+        return value
+
+    @field_validator("category")
+    @classmethod
+    def strip_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class ExpenseCreateResponse(BaseModel):
@@ -41,6 +57,8 @@ class ExpenseCreateResponse(BaseModel):
 
 
 class ExpenseItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     amount: float
     note: str
@@ -103,8 +121,16 @@ class ExpenseDeleteResponse(BaseModel):
 
 
 class AiSuggestCategoryRequest(BaseModel):
-    amount: float
-    note: str
+    amount: float = Field(gt=0)
+    note: str = Field(min_length=1, max_length=100)
+
+    @field_validator("note")
+    @classmethod
+    def strip_note(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("备注不能为空")
+        return value
 
 
 class AiSuggestCategoryResponse(BaseModel):
@@ -113,7 +139,15 @@ class AiSuggestCategoryResponse(BaseModel):
 
 
 class AiOptimizeNoteRequest(BaseModel):
-    note: str
+    note: str = Field(min_length=1, max_length=100)
+
+    @field_validator("note")
+    @classmethod
+    def strip_note(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("备注不能为空")
+        return value
 
 
 class AiOptimizeNoteResponse(BaseModel):

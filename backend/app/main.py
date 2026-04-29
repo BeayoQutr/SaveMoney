@@ -2,6 +2,7 @@ import calendar
 import csv
 import io
 import json
+from collections.abc import Mapping
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -113,6 +114,41 @@ def normalize_expense_category(category: str | None, note: str) -> str:
     return classify_expense(note)
 
 
+def parse_month(month: str) -> tuple[date, date]:
+    try:
+        parsed = datetime.strptime(month + "-01", "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="month 格式错误，应为 YYYY-MM") from None
+
+    days_in_month = calendar.monthrange(parsed.year, parsed.month)[1]
+    start_date = date(parsed.year, parsed.month, 1)
+    end_date = date(parsed.year, parsed.month, days_in_month)
+    return start_date, end_date
+
+
+def validate_date_range(start_date: date, end_date: date) -> None:
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="开始日期不能晚于结束日期")
+
+
+def parse_ai_json_object(raw: str) -> dict:
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start == -1 or end == -1 or start >= end:
+            raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试") from None
+        try:
+            data = json.loads(raw[start : end + 1])
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试") from None
+
+    if not isinstance(data, Mapping):
+        raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试")
+    return dict(data)
+
+
 @app.get("/expenses/summary/daily", response_model=DailyExpenseSummaryResponse)
 def daily_expense_summary(query_date: date, db: Session = Depends(get_db)):
     result = (
@@ -145,6 +181,8 @@ def list_expenses(db: Session = Depends(get_db)):
 
 @app.get("/expenses/summary/category", response_model=CategorySummaryResponse)
 def expenses_summary_category(start_date: date, end_date: date, db: Session = Depends(get_db)):
+    validate_date_range(start_date, end_date)
+
     rows = (
         db.query(
             Expense.category,
@@ -174,17 +212,8 @@ def expenses_summary_category(start_date: date, end_date: date, db: Session = De
 
 @app.get("/expenses/summary/monthly", response_model=MonthlyExpenseSummaryResponse)
 def expenses_summary_monthly(month: str, db: Session = Depends(get_db)):
-    try:
-        parsed = datetime.strptime(month + "-01", "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=422, detail="month 格式错误，应为 YYYY-MM")
-
-    year = parsed.year
-    month_int = parsed.month
-    days_in_month = calendar.monthrange(year, month_int)[1]
-
-    start_date = date(year, month_int, 1)
-    end_date = date(year, month_int, days_in_month)
+    start_date, end_date = parse_month(month)
+    days_in_month = calendar.monthrange(start_date.year, start_date.month)[1]
 
     overall = (
         db.query(
@@ -292,17 +321,8 @@ def update_expense(expense_id: int, data: ExpenseCreateRequest, db: Session = De
 
 @app.get("/ai/monthly-advice", response_model=AiMonthlyAdviceResponse)
 def ai_monthly_advice(month: str, db: Session = Depends(get_db)):
-    try:
-        parsed = datetime.strptime(month + "-01", "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=422, detail="month 格式错误，应为 YYYY-MM")
-
-    year = parsed.year
-    month_int = parsed.month
-    days_in_month = calendar.monthrange(year, month_int)[1]
-
-    start_date = date(year, month_int, 1)
-    end_date = date(year, month_int, days_in_month)
+    start_date, end_date = parse_month(month)
+    days_in_month = calendar.monthrange(start_date.year, start_date.month)[1]
 
     overall = (
         db.query(
@@ -376,6 +396,8 @@ def export_expenses_csv(
     end_date: date,
     db: Session = Depends(get_db),
 ):
+    validate_date_range(start_date, end_date)
+
     rows = (
         db.query(Expense)
         .filter(Expense.date >= start_date, Expense.date <= end_date)
@@ -400,12 +422,7 @@ def export_expenses_csv(
 
 @app.post("/ai/suggest-category", response_model=AiSuggestCategoryResponse)
 def ai_suggest_category(payload: AiSuggestCategoryRequest):
-    if payload.amount <= 0:
-        raise HTTPException(status_code=422, detail="金额必须大于 0")
-
-    note = payload.note.strip()
-    if not note:
-        raise HTTPException(status_code=422, detail="备注不能为空")
+    note = payload.note
 
     categories_text = "、".join(AI_ALLOWED_CATEGORIES)
 
@@ -440,10 +457,7 @@ def ai_suggest_category(payload: AiSuggestCategoryRequest):
     except RuntimeError:
         raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试")
 
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试")
+    data = parse_ai_json_object(raw)
 
     category = data.get("category", "其他")
     if category not in AI_ALLOWED_CATEGORIES:
@@ -462,9 +476,7 @@ def ai_suggest_category(payload: AiSuggestCategoryRequest):
 
 @app.post("/ai/optimize-note", response_model=AiOptimizeNoteResponse)
 def ai_optimize_note(payload: AiOptimizeNoteRequest):
-    note = payload.note.strip()
-    if not note:
-        raise HTTPException(status_code=422, detail="备注不能为空")
+    note = payload.note
 
     system_prompt = (
         "你是个人记账应用里的消费备注优化助手。"
@@ -497,10 +509,7 @@ def ai_optimize_note(payload: AiOptimizeNoteRequest):
     except RuntimeError:
         raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试")
 
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        raise HTTPException(status_code=502, detail="AI 返回格式异常，请稍后再试")
+    data = parse_ai_json_object(raw)
 
     optimized_note = data.get("optimized_note", "")
     if not optimized_note:

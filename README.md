@@ -31,6 +31,8 @@
 - 前后端分离架构
 - SQLite 本地数据库
 - DeepSeek API 接入
+- 后端接口回归测试
+- 前端 lint 和生产构建检查
 
 ## 技术栈
 
@@ -39,6 +41,16 @@
 - **数据库**：SQLite
 - **AI**：DeepSeek API
 - **版本管理**：Git / GitHub
+
+## 稳定性与工程化
+
+- 后端数据库默认固定到 `backend/savemoney.db`，避免从不同目录启动时生成多个数据库文件
+- 支持通过 `SAVEMONEY_DATABASE_URL` 指定数据库连接，便于测试和临时环境隔离
+- 消费记录和 AI 请求增加输入清洗与校验，避免空备注、非法金额和过长文本进入业务逻辑
+- 分类统计和 CSV 导出会校验日期范围，开始日期晚于结束日期时返回明确错误
+- AI JSON 返回增加容错解析，可兼容模型返回 Markdown 代码块包裹 JSON 的情况
+- 新增后端回归测试，覆盖消费记录 CRUD、日期范围校验、月份参数校验和 AI JSON 解析
+- 前端页面元信息已改为项目名称，页面语言标记为 `zh-CN`
 
 ## 本地运行
 
@@ -87,6 +99,19 @@ npm run dev
 
 前端跑在 `http://localhost:3000`，启动后自动连接后端。
 
+### 5. 运行检查
+
+```bash
+# 后端回归测试
+cd backend
+python -m unittest discover -s tests -v
+
+# 前端代码检查和生产构建
+cd frontend
+npm run lint
+npm run build
+```
+
 ## 环境变量说明
 
 | 变量 | 说明 | 位置 |
@@ -94,6 +119,7 @@ npm run dev
 | `DEEPSEEK_API_KEY` | DeepSeek API Key，用于 AI 功能 | `backend/.env` |
 | `DEEPSEEK_BASE_URL` | DeepSeek API 地址 | `backend/.env` |
 | `DEEPSEEK_MODEL` | 使用的模型名称 | `backend/.env` |
+| `SAVEMONEY_DATABASE_URL` | 后端数据库连接地址，默认使用 `backend/savemoney.db` | 后端环境变量（可选，主要用于测试） |
 | `NEXT_PUBLIC_API_BASE_URL` | 前端连接的后端地址，默认 `http://127.0.0.1:8000` | `frontend/.env.local`（可选） |
 
 请勿将真实 API Key 提交到 Git。`backend/.env` 已在 `.gitignore` 中。
@@ -114,8 +140,9 @@ npm run dev
 
 ## 后续计划
 
-- 补充项目截图
 - 根据需要优化页面细节
+- 拆分前端大页面组件，提升长期维护性
+- 增加更多预算分析维度和测试覆盖
 - 如果需要移动端，单独开发 Android 原生版
 
 ## 注意事项

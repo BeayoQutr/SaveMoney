@@ -15,12 +15,12 @@ def call_deepseek(
 ) -> str:
     api_key = os.getenv("DEEPSEEK_API_KEY")
     base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
     if not api_key:
         raise ValueError("未配置 DEEPSEEK_API_KEY")
 
-    request_url = f"{base_url}/chat/completions"
+    request_url = f"{base_url.rstrip('/')}/chat/completions"
 
     try:
         response = httpx.post(
@@ -35,7 +35,6 @@ def call_deepseek(
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "stream": False,
-                "thinking": {"type": "disabled"},
             },
             timeout=httpx.Timeout(60.0, connect=10.0),
         )

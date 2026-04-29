@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, Integer, Float, String, Date, DateTime
 
@@ -13,4 +13,4 @@ class Expense(Base):
     note = Column(String, nullable=False)
     date = Column(Date, nullable=False)
     category = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
