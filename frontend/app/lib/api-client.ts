@@ -6,7 +6,6 @@ import {
   AiSuggestCategoryResponse,
   CategorySummary,
   DailySummary,
-  ExpenseItem,
   ExpenseListResponse,
   ExpensePayload,
   ExpenseResult,

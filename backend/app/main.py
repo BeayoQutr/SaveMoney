@@ -3,12 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import verify_token
 from app.database import Base, engine
+from app.db_migrations import ensure_sqlite_schema_compatibility
 from app.routers import ai, backup, expenses, plans
 
 
 app = FastAPI(title="SaveMoney API")
 
 Base.metadata.create_all(bind=engine)
+ensure_sqlite_schema_compatibility(engine)
 
 app.add_middleware(
     CORSMiddleware,

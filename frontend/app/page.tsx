@@ -30,13 +30,13 @@ export default function Home() {
 
         <BackendStatus />
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
-          <div className="grid gap-5">
+        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+          <div className="grid min-w-0 gap-5">
             <ExpenseForm onChanged={notifyDataChanged} />
             <MonthlySummary refreshKey={refreshKey} />
           </div>
 
-          <div className="grid content-start gap-5">
+          <div className="grid min-w-0 content-start gap-5">
             <ExpenseList refreshKey={refreshKey} onChanged={notifyDataChanged} />
             <ExportPanel />
           </div>

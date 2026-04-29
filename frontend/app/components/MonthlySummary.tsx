@@ -170,7 +170,7 @@ export function MonthlySummary({ refreshKey }: MonthlySummaryProps) {
   }
 
   return (
-    <section className="rounded-lg border border-gray-800 p-4 sm:p-5">
+    <section className="min-w-0 rounded-lg border border-gray-800 p-4 sm:p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-bold">本月总览与统计</h2>
         <button
@@ -183,6 +183,11 @@ export function MonthlySummary({ refreshKey }: MonthlySummaryProps) {
       </div>
 
       {monthlyError && <p className="mt-3 rounded-lg bg-red-950 px-3 py-2 text-sm">{monthlyError}</p>}
+      {monthlyLoading && !monthly && (
+        <p className="mt-3 rounded-lg bg-gray-950 px-3 py-3 text-sm text-gray-300">
+          正在加载本月总览...
+        </p>
+      )}
       {monthly && (
         <div className="mt-4 grid gap-3 rounded-lg bg-gray-950 p-4 text-sm sm:grid-cols-2">
           <p>当前月份：{monthly.month}</p>
@@ -212,6 +217,11 @@ export function MonthlySummary({ refreshKey }: MonthlySummaryProps) {
             </p>
           ))}
         </div>
+      )}
+      {monthly && monthly.items.length === 0 && !monthlyError && (
+        <p className="mt-4 rounded-lg border border-gray-800 bg-gray-950 px-3 py-3 text-sm text-gray-300">
+          本月还没有分类明细。记录消费后会显示各分类的金额和笔数。
+        </p>
       )}
 
       <div className="mt-5 grid gap-2">

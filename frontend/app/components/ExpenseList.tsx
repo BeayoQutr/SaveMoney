@@ -38,6 +38,9 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
   const [filterKeyword, setFilterKeyword] = useState("");
   const [pageOffset, setPageOffset] = useState(0);
   const pageLimit = 20;
+  const hasActiveFilters = Boolean(
+    filterStartDate || filterEndDate || filterCategory || filterKeyword
+  );
 
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
@@ -51,8 +54,8 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
         limit: pageLimit,
         offset: pageOffset,
       });
-      setItems(result.items);
-      setTotal(result.total);
+      setItems(result.items ?? []);
+      setTotal(result.total ?? 0);
     } catch (err) {
       setError(getErrorMessage(err, "消费记录加载失败，请确认后端已启动"));
     } finally {
@@ -146,7 +149,7 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
   const currentPage = Math.floor(pageOffset / pageLimit) + 1;
 
   return (
-    <section className="rounded-lg border border-gray-800 p-4 sm:p-5">
+    <section className="min-w-0 rounded-lg border border-gray-800 p-4 sm:p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-bold">消费记录</h2>
         <button
@@ -159,31 +162,31 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
       </div>
 
       {/* Filter bar */}
-      <div className="mt-4 grid gap-3 rounded-lg border border-gray-800 bg-gray-950 p-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="grid gap-1 text-sm">
+      <div className="mt-4 grid gap-3 rounded-lg border border-gray-800 bg-gray-950 p-3 sm:grid-cols-2 xl:grid-cols-4">
+        <label className="grid min-w-0 gap-1 text-sm">
           开始日期
           <input
             type="date"
             value={filterStartDate}
             onChange={(e) => setFilterStartDate(e.target.value)}
-            className="min-h-10 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
+            className="min-h-10 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
           />
         </label>
-        <label className="grid gap-1 text-sm">
+        <label className="grid min-w-0 gap-1 text-sm">
           结束日期
           <input
             type="date"
             value={filterEndDate}
             onChange={(e) => setFilterEndDate(e.target.value)}
-            className="min-h-10 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
+            className="min-h-10 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
           />
         </label>
-        <label className="grid gap-1 text-sm">
+        <label className="grid min-w-0 gap-1 text-sm">
           分类
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="min-h-10 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
+            className="min-h-10 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
           >
             <option value="">全部分类</option>
             {categories.map((cat) => (
@@ -193,17 +196,17 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
             ))}
           </select>
         </label>
-        <label className="grid gap-1 text-sm">
+        <label className="grid min-w-0 gap-1 text-sm">
           关键词搜索
           <input
             type="text"
             value={filterKeyword}
             onChange={(e) => setFilterKeyword(e.target.value)}
-            className="min-h-10 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
+            className="min-h-10 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-900 px-3 text-sm"
             placeholder="输入备注关键词"
           />
         </label>
-        <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
+        <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-4">
           <button
             type="button"
             onClick={applyFilters}
@@ -225,8 +228,19 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
       {error && <p className="mt-3 rounded-lg bg-red-950 px-3 py-2 text-sm">{error}</p>}
 
       <div className="mt-4 grid gap-3">
-        {!loading && items.length === 0 && (
-          <p className="rounded-lg bg-gray-900 px-3 py-3 text-sm text-gray-300">暂无消费记录</p>
+        {loading && (
+          <p className="rounded-lg bg-gray-900 px-3 py-3 text-sm text-gray-300">
+            正在加载消费记录...
+          </p>
+        )}
+
+        {!loading && !error && items.length === 0 && (
+          <div className="rounded-lg bg-gray-900 px-3 py-3 text-sm text-gray-300">
+            <p>{hasActiveFilters ? "当前筛选条件下暂无消费记录" : "暂无消费记录"}</p>
+            {!hasActiveFilters && (
+              <p className="mt-1 text-gray-400">先在左侧保存一笔消费，这里会自动刷新。</p>
+            )}
+          </div>
         )}
 
         {items.map((item) => (

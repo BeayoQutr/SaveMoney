@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -186,6 +187,42 @@ class SaveMoneyApiTest(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["category"], "餐饮")
         self.assertIn("本地规则", data["reason"])
+
+    def test_startup_migration_repairs_legacy_sqlite_expense_schema(self) -> None:
+        from sqlalchemy import create_engine, text
+        from app.db_migrations import ensure_sqlite_schema_compatibility
+
+        db_path = Path(self.temp_dir.name) / "legacy_schema.db"
+        connection = sqlite3.connect(db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE expenses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    amount FLOAT NOT NULL,
+                    note VARCHAR NOT NULL,
+                    date DATE NOT NULL,
+                    category VARCHAR NOT NULL,
+                    created_at DATETIME
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+        try:
+            ensure_sqlite_schema_compatibility(engine)
+            with engine.connect() as conn:
+                rows = conn.execute(text("PRAGMA table_info(expenses)")).fetchall()
+                columns = {row[1] for row in rows}
+
+            self.assertIn("amount_cents", columns)
+            self.assertIn("payment_method", columns)
+            self.assertIn("is_necessary", columns)
+        finally:
+            engine.dispose()
 
 
 if __name__ == "__main__":

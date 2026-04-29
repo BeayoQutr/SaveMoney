@@ -65,7 +65,7 @@ export function ExportPanel() {
   }
 
   return (
-    <section className="rounded-lg border border-gray-800 p-4 sm:p-5">
+    <section className="min-w-0 rounded-lg border border-gray-800 p-4 sm:p-5">
       <h2 className="text-xl font-bold">导出消费记录</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">
