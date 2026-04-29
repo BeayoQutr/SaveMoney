@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.ai_client import is_ai_configured
 from app.database import get_db
 from app.schemas import (
     AiMonthlyAdviceResponse,
@@ -13,6 +14,11 @@ from app.services import ai_service
 
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+@router.get("/status")
+def ai_status():
+    return {"ai_configured": is_ai_configured()}
 
 
 @router.get("/monthly-advice", response_model=AiMonthlyAdviceResponse)

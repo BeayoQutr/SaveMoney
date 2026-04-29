@@ -44,6 +44,8 @@ export type ExpenseItem = {
   note: string;
   date: string;
   category: string;
+  payment_method: string | null;
+  is_necessary: number | null;
 };
 
 export type ExpensePayload = {
@@ -51,10 +53,19 @@ export type ExpensePayload = {
   note: string;
   date: string;
   category?: string;
+  payment_method?: string;
+  is_necessary?: number;
 };
 
 export type ExpenseResult = ExpenseItem & {
   message: string;
+};
+
+export type ExpenseListResponse = {
+  items: ExpenseItem[];
+  total: number;
+  limit: number;
+  offset: number;
 };
 
 export type DailySummary = {
@@ -102,4 +113,23 @@ export type Preset = {
   fixedExpenses: string;
   minimumLivingCost: string;
   identity: string;
+};
+
+export type SavingPlanItem = {
+  id: number;
+  target_amount: number;
+  deadline: string;
+  monthly_income: number;
+  fixed_expenses: number;
+  minimum_living_cost: number;
+  identity: string | null;
+  saved_amount: number;
+  status: string;
+};
+
+export type SavingPlanCurrentResponse = {
+  plan: SavingPlanItem | null;
+  daily_saving: number | null;
+  daily_available: number | null;
+  remaining_days: number | null;
 };

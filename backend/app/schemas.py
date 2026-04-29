@@ -29,6 +29,8 @@ class ExpenseCreateRequest(BaseModel):
     note: str = Field(min_length=1, max_length=100)
     date: date
     category: str | None = Field(default=None, max_length=20)
+    payment_method: str | None = Field(default=None, max_length=20)
+    is_necessary: int | None = Field(default=None, ge=0, le=1)
 
     @field_validator("note")
     @classmethod
@@ -46,6 +48,14 @@ class ExpenseCreateRequest(BaseModel):
         value = value.strip()
         return value or None
 
+    @field_validator("payment_method")
+    @classmethod
+    def strip_payment_method(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
 
 class ExpenseCreateResponse(BaseModel):
     id: int
@@ -53,6 +63,8 @@ class ExpenseCreateResponse(BaseModel):
     note: str
     date: date
     category: str
+    payment_method: str | None = None
+    is_necessary: int | None = None
     message: str
 
 
@@ -64,6 +76,8 @@ class ExpenseItemResponse(BaseModel):
     note: str
     date: date
     category: str
+    payment_method: str | None = None
+    is_necessary: int | None = None
 
 
 class DailyExpenseSummaryResponse(BaseModel):
@@ -152,3 +166,35 @@ class AiOptimizeNoteRequest(BaseModel):
 
 class AiOptimizeNoteResponse(BaseModel):
     optimized_note: str
+
+
+class ExpenseListResponse(BaseModel):
+    items: list[ExpenseItemResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class SavingPlanItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    target_amount: float
+    deadline: date
+    monthly_income: float
+    fixed_expenses: float
+    minimum_living_cost: float
+    identity: str | None = None
+    saved_amount: float
+    status: str
+
+
+class SavingPlanCurrentResponse(BaseModel):
+    plan: SavingPlanItemResponse | None = None
+    daily_saving: float | None = None
+    daily_available: float | None = None
+    remaining_days: int | None = None
+
+
+class SavingPlanUpdateRequest(BaseModel):
+    saved_amount: float = Field(ge=0)

@@ -3,7 +3,7 @@ import logging
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.ai_client import call_deepseek
+from app.ai_client import call_deepseek, is_ai_configured
 from app.schemas import (
     AiMonthlyAdviceResponse,
     AiOptimizeNoteRequest,
@@ -57,6 +57,12 @@ def get_monthly_advice(db: Session, month: str) -> AiMonthlyAdviceResponse:
             advice="这个月还没有消费记录，暂时无法生成 AI 消费分析。你可以先记录几笔消费后再试。",
         )
 
+    if not is_ai_configured():
+        return AiMonthlyAdviceResponse(
+            month=month,
+            advice="未配置 DeepSeek API Key，无法生成 AI 分析。请在 backend/.env 中配置 DEEPSEEK_API_KEY 后重试。",
+        )
+
     category_lines = "\n".join(
         f"- {item.category}：{item.total_amount} 元（{item.count} 笔）"
         for item in summary.items
@@ -79,8 +85,6 @@ def get_monthly_advice(db: Session, month: str) -> AiMonthlyAdviceResponse:
             temperature=0.4,
             max_tokens=500,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试") from exc
 
@@ -132,6 +136,9 @@ def suggest_category(payload: AiSuggestCategoryRequest) -> AiSuggestCategoryResp
 
 
 def optimize_note(payload: AiOptimizeNoteRequest) -> AiOptimizeNoteResponse:
+    if not is_ai_configured():
+        return AiOptimizeNoteResponse(optimized_note=payload.note)
+
     user_prompt = (
         f"原始备注：{payload.note}\n\n"
         "请返回严格 JSON：\n"
@@ -150,8 +157,6 @@ def optimize_note(payload: AiOptimizeNoteRequest) -> AiOptimizeNoteResponse:
             max_tokens=120,
         )
         data = parse_ai_json_object(raw)
-    except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except (RuntimeError, HTTPException) as exc:
         raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后再试") from exc
 

@@ -10,7 +10,26 @@ class Expense(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     amount = Column(Float, nullable=False)
+    amount_cents = Column(Integer, nullable=True, default=None)
     note = Column(String, nullable=False)
     date = Column(Date, nullable=False)
     category = Column(String, nullable=False)
+    payment_method = Column(String, nullable=True, default=None)
+    is_necessary = Column(Integer, nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class SavingPlan(Base):
+    __tablename__ = "saving_plans"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    target_amount = Column(Float, nullable=False)
+    deadline = Column(Date, nullable=False)
+    monthly_income = Column(Float, nullable=False)
+    fixed_expenses = Column(Float, nullable=False)
+    minimum_living_cost = Column(Float, nullable=False)
+    identity = Column(String, nullable=True, default=None)
+    saved_amount = Column(Float, nullable=False, default=0.0)
+    status = Column(String, nullable=False, default="active")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))

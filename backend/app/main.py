@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import verify_token
 from app.database import Base, engine
-from app.routers import ai, expenses, plans
+from app.routers import ai, backup, expenses, plans
 
 
 app = FastAPI(title="SaveMoney API")
@@ -17,9 +18,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(plans.router)
-app.include_router(expenses.router)
-app.include_router(ai.router)
+app.include_router(plans.router, dependencies=[Depends(verify_token)])
+app.include_router(expenses.router, dependencies=[Depends(verify_token)])
+app.include_router(ai.router, dependencies=[Depends(verify_token)])
+app.include_router(backup.router, dependencies=[Depends(verify_token)])
 
 
 @app.get("/")

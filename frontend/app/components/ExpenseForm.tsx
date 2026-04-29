@@ -6,6 +6,7 @@ import { apiClient, ApiError } from "../lib/api-client";
 
 const quickNotes = ["早餐", "午餐", "晚餐", "公交", "地铁", "学习", "买药", "购物"];
 const categories = ["餐饮", "交通", "学习", "娱乐", "购物", "医疗", "生活", "其他"];
+const paymentMethods = ["微信", "支付宝", "现金", "银行卡", "信用卡"];
 
 function getTodayLocalDateString() {
   const now = new Date();
@@ -34,6 +35,8 @@ export function ExpenseForm({ onChanged }: ExpenseFormProps) {
   const [note, setNote] = useState("");
   const [date, setDate] = useState(getTodayLocalDateString());
   const [category, setCategory] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [isNecessary, setIsNecessary] = useState<number | "">("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [aiReason, setAiReason] = useState("");
@@ -43,6 +46,15 @@ export function ExpenseForm({ onChanged }: ExpenseFormProps) {
 
   function resetAiState() {
     setCategory("");
+    setAiReason("");
+  }
+
+  function resetForm() {
+    setAmount("");
+    setNote("");
+    setCategory("");
+    setPaymentMethod("");
+    setIsNecessary("");
     setAiReason("");
   }
 
@@ -117,11 +129,10 @@ export function ExpenseForm({ onChanged }: ExpenseFormProps) {
         note: note.trim(),
         date,
         category: category || undefined,
+        payment_method: paymentMethod || undefined,
+        is_necessary: isNecessary !== "" ? isNecessary : undefined,
       });
-      setAmount("");
-      setNote("");
-      setCategory("");
-      setAiReason("");
+      resetForm();
       setSuccess(`${result.message}：${result.amount} 元，${result.category}`);
       onChanged();
     } catch (err) {
@@ -208,6 +219,32 @@ export function ExpenseForm({ onChanged }: ExpenseFormProps) {
             onChange={(event) => setDate(event.target.value)}
             className="min-h-12 rounded-lg border border-gray-700 bg-gray-900 px-3 text-base"
           />
+        </label>
+
+        <label className="grid gap-1 text-sm font-medium">
+          支付方式
+          <select
+            value={paymentMethod}
+            onChange={(event) => setPaymentMethod(event.target.value)}
+            className="min-h-12 rounded-lg border border-gray-700 bg-gray-900 px-3 text-base"
+          >
+            <option value="">选择支付方式（可选）</option>
+            {paymentMethods.map((method) => (
+              <option key={method} value={method}>
+                {method}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-3 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={isNecessary === 1}
+            onChange={(event) => setIsNecessary(event.target.checked ? 1 : 0)}
+            className="h-5 w-5 rounded border-gray-700 bg-gray-900"
+          />
+          必要消费
         </label>
 
         <div className="grid gap-2 sm:grid-cols-3">

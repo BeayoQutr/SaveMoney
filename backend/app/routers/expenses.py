@@ -13,6 +13,7 @@ from app.schemas import (
     ExpenseCreateResponse,
     ExpenseDeleteResponse,
     ExpenseItemResponse,
+    ExpenseListResponse,
     MonthlyExpenseSummaryResponse,
 )
 from app.services import expense_service
@@ -22,9 +23,25 @@ from app.utils.csv_utils import build_expenses_csv_response
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
 
-@router.get("", response_model=List[ExpenseItemResponse])
-def list_expenses(db: Session = Depends(get_db)):
-    return expense_service.list_expenses(db)
+@router.get("", response_model=ExpenseListResponse)
+def list_expenses(
+    start_date: date | None = None,
+    end_date: date | None = None,
+    category: str | None = None,
+    keyword: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    return expense_service.list_expenses(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        category=category,
+        keyword=keyword,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("", response_model=ExpenseCreateResponse)

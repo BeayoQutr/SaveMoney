@@ -13,10 +13,11 @@ from app.schemas import (
     ExpenseCreateRequest,
     ExpenseCreateResponse,
     ExpenseDeleteResponse,
+    ExpenseListResponse,
     MonthlyExpenseSummaryResponse,
 )
 from app.utils.date_utils import parse_month, validate_date_range
-from app.utils.money import round_money, sum_money
+from app.utils.money import from_cents, round_money, sum_money, to_cents
 
 
 AI_ALLOWED_CATEGORIES = [
@@ -53,16 +54,40 @@ def normalize_expense_category(category: str | None, note: str) -> str:
     return classify_expense(note)
 
 
-def list_expenses(db: Session, limit: int = 50) -> list[Expense]:
-    return db.query(Expense).order_by(Expense.id.desc()).limit(limit).all()
+def list_expenses(
+    db: Session,
+    *,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    category: str | None = None,
+    keyword: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> ExpenseListResponse:
+    query = db.query(Expense)
+    if start_date is not None:
+        query = query.filter(Expense.date >= start_date)
+    if end_date is not None:
+        query = query.filter(Expense.date <= end_date)
+    if category is not None:
+        query = query.filter(Expense.category == category)
+    if keyword is not None:
+        query = query.filter(Expense.note.contains(keyword))
+    total = query.count()
+    items = query.order_by(Expense.date.desc(), Expense.id.desc()).offset(offset).limit(limit).all()
+    return ExpenseListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
 def create_expense(db: Session, data: ExpenseCreateRequest) -> ExpenseCreateResponse:
+    amount_val = round_money(data.amount)
     expense = Expense(
-        amount=round_money(data.amount),
+        amount=amount_val,
+        amount_cents=to_cents(amount_val),
         note=data.note,
         date=data.date,
         category=normalize_expense_category(data.category, data.note),
+        payment_method=data.payment_method,
+        is_necessary=data.is_necessary,
     )
     db.add(expense)
     db.commit()
@@ -73,6 +98,8 @@ def create_expense(db: Session, data: ExpenseCreateRequest) -> ExpenseCreateResp
         note=expense.note,
         date=expense.date,
         category=expense.category,
+        payment_method=expense.payment_method,
+        is_necessary=expense.is_necessary,
         message="消费记录成功",
     )
 
@@ -86,10 +113,14 @@ def update_expense(
     if expense is None:
         raise HTTPException(status_code=404, detail="消费记录不存在")
 
-    expense.amount = round_money(data.amount)
+    amount_val = round_money(data.amount)
+    expense.amount = amount_val
+    expense.amount_cents = to_cents(amount_val)
     expense.note = data.note
     expense.date = data.date
     expense.category = normalize_expense_category(data.category, data.note)
+    expense.payment_method = data.payment_method
+    expense.is_necessary = data.is_necessary
 
     db.commit()
     db.refresh(expense)
@@ -100,6 +131,8 @@ def update_expense(
         note=expense.note,
         date=expense.date,
         category=expense.category,
+        payment_method=expense.payment_method,
+        is_necessary=expense.is_necessary,
         message="消费记录更新成功",
     )
 

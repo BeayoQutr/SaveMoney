@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { usePreset } from "../hooks/usePreset";
 import { apiClient, ApiError } from "../lib/api-client";
-import { AdjustResult, PlanResult } from "../types";
+import { AdjustResult, PlanResult, SavingPlanCurrentResponse } from "../types";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message || fallback : fallback;
@@ -18,6 +18,11 @@ export function PlanForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [savedAmount, setSavedAmount] = useState("");
+  const [currentPlan, setCurrentPlan] = useState<SavingPlanCurrentResponse | null>(null);
+
+  useEffect(() => {
+    void apiClient.getCurrentPlan().then(setCurrentPlan).catch(() => {});
+  }, []);
   const [actualExpenseToday, setActualExpenseToday] = useState("");
   const [adjustResult, setAdjustResult] = useState<AdjustResult | null>(null);
   const [adjustError, setAdjustError] = useState("");
@@ -194,6 +199,36 @@ export function PlanForm() {
 
       {message && <p className="mt-3 rounded-lg bg-gray-900 px-3 py-2 text-sm">{message}</p>}
       {error && <p className="mt-3 rounded-lg bg-red-950 px-3 py-2 text-sm">{error}</p>}
+
+      {currentPlan?.plan && (
+        <div className="mt-4 rounded-lg border border-emerald-700 bg-emerald-950 p-4 text-sm">
+          <h3 className="mb-2 font-semibold text-emerald-300">🎯 当前活动计划</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <p>目标：¥{currentPlan.plan.target_amount.toLocaleString()}</p>
+            <p>已攒：¥{currentPlan.plan.saved_amount.toLocaleString()}</p>
+            <p>截止：{currentPlan.plan.deadline}</p>
+            <p>剩余：{currentPlan.remaining_days ?? 0} 天</p>
+            {currentPlan.daily_saving !== null && (
+              <p>今日建议最多花：<span className="font-semibold text-yellow-300">¥{currentPlan.daily_available}</span></p>
+            )}
+          </div>
+          {/* Progress bar */}
+          <div className="mt-3 h-3 w-full rounded-full bg-gray-800">
+            <div
+              className="h-3 rounded-full bg-emerald-500 transition-all"
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.round((currentPlan.plan.saved_amount / currentPlan.plan.target_amount) * 100)
+                )}%`,
+              }}
+            />
+          </div>
+          <p className="mt-1 text-right text-xs text-gray-400">
+            {Math.round((currentPlan.plan.saved_amount / currentPlan.plan.target_amount) * 100)}% 已完成
+          </p>
+        </div>
+      )}
 
       {result && (
         <div className="mt-4 grid gap-3 rounded-lg border border-gray-800 bg-gray-950 p-4 text-sm sm:grid-cols-2">

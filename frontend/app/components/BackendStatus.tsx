@@ -6,14 +6,22 @@ import { apiClient } from "../lib/api-client";
 
 export function BackendStatus() {
   const [online, setOnline] = useState<boolean | null>(null);
+  const [aiReady, setAiReady] = useState<boolean | null>(null);
   const [message, setMessage] = useState("正在检测后端连接...");
 
   const checkBackend = useCallback(async () => {
     setOnline(null);
+    setAiReady(null);
     setMessage("正在检测后端连接...");
     try {
       await apiClient.health();
       setOnline(true);
+      try {
+        const ai = await apiClient.aiStatus();
+        setAiReady(ai.ai_configured);
+      } catch {
+        setAiReady(false);
+      }
       setMessage("后端已连接，可以正常记账");
     } catch {
       setOnline(false);
@@ -35,10 +43,17 @@ export function BackendStatus() {
   return (
     <section className={`rounded-lg border px-4 py-3 text-sm ${statusClass}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p>
-          <span className="font-semibold">连接状态：</span>
-          {message}
-        </p>
+        <div>
+          <p>
+            <span className="font-semibold">连接状态：</span>
+            {message}
+          </p>
+          {online === true && aiReady !== null && (
+            <p className="mt-1 text-xs">
+              {aiReady ? "🤖 AI 功能已就绪" : "⚠️ AI 未配置（DeepSeek Key 缺失）— 普通记账正常可用"}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => void checkBackend()}

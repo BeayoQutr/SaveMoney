@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { BackendStatus } from "./components/BackendStatus";
+import { BackupPanel } from "./components/BackupPanel";
 import { ExportPanel } from "./components/ExportPanel";
 import { ExpenseForm } from "./components/ExpenseForm";
 import { ExpenseList } from "./components/ExpenseList";
@@ -43,10 +44,13 @@ export default function Home() {
 
         <PlanForm />
 
+        <BackupPanel />
+
         <section className="rounded-lg border border-gray-800 p-4 text-sm text-gray-300">
           <h2 className="font-semibold text-gray-100">数据存储说明</h2>
           <p className="mt-2">消费记录保存在本地 SQLite 数据库中，默认文件为 backend/savemoney.db。</p>
-          <p>常用信息保存在浏览器 localStorage 中，CSV 导出可作为消费记录备份。</p>
+          <p>常用信息保存在浏览器 localStorage 中。请定期使用上方「备份与恢复」功能下载数据库备份。</p>
+          <p className="mt-1 font-semibold text-yellow-300">迁移或重装环境前，务必先下载数据库备份！</p>
         </section>
 
         <p className="pb-4 text-center text-xs text-gray-500">作者：岁年</p>

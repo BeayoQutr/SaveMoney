@@ -11,6 +11,11 @@ load_dotenv(dotenv_path=env_path)
 logger = logging.getLogger(__name__)
 
 
+def is_ai_configured() -> bool:
+    """Return True if DEEPSEEK_API_KEY is configured."""
+    return bool(os.getenv("DEEPSEEK_API_KEY", "").strip())
+
+
 def call_deepseek(
     messages: list[dict],
     temperature: float = 0.4,

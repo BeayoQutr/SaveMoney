@@ -158,12 +158,12 @@ class SaveMoneyApiTest(unittest.TestCase):
         with self.assertRaises(HTTPException):
             parse_ai_json_object("无法分类")
 
-    def test_ai_without_api_key_returns_clear_error(self) -> None:
+    def test_ai_without_api_key_returns_graceful_fallback(self) -> None:
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}):
             response = self.client.post("/ai/optimize-note", json={"note": " 午餐 "})
 
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("DEEPSEEK_API_KEY", response.json()["detail"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["optimized_note"], "午餐")
 
         create_response = self.client.post(
             "/expenses",
