@@ -1,13 +1,22 @@
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import verify_token
 from app.database import Base, engine
 from app.db_migrations import ensure_sqlite_schema_compatibility
+from app.error_handlers import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 from app.routers import ai, backup, expenses, plans
 
 
 app = FastAPI(title="SaveMoney API")
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 Base.metadata.create_all(bind=engine)
 ensure_sqlite_schema_compatibility(engine)

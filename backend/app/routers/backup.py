@@ -8,10 +8,16 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
+from app.db_migrations import ensure_sqlite_schema_compatibility
 from app.schemas import ExpenseCreateRequest
 from app.services.expense_service import create_expense
-from app.utils.backup_utils import create_backup, get_db_path, restore_from_file
+from app.utils.backup_utils import (
+    create_backup,
+    get_db_path,
+    restore_from_file,
+    validate_sqlite_backup,
+)
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -33,24 +39,31 @@ def download_db():
 async def restore_db(file: UploadFile = File(...)):
     """Upload a SQLite database file to replace the current one.
     Creates an automatic backup before restoring."""
-    # Create backup before restoring
-    try:
-        backup_path = create_backup()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"自动备份失败: {e}")
-
-    # Save uploaded file to a temp location
     tmp_path: Path | None = None
     try:
-        suffix = ".db"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
-            tmp.write(content)
-            tmp_path = Path(tmp.name)
+        try:
+            suffix = ".db"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                content = await file.read()
+                tmp.write(content)
+                tmp_path = Path(tmp.name)
 
-        restore_from_file(tmp_path)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"恢复失败: {e}")
+            validate_sqlite_backup(tmp_path)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"备份文件校验失败: {e}")
+
+        try:
+            backup_path = create_backup()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"自动备份失败: {e}")
+
+        try:
+            engine.dispose()
+            restore_from_file(tmp_path)
+            engine.dispose()
+            ensure_sqlite_schema_compatibility(engine)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"恢复失败: {e}")
     finally:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)

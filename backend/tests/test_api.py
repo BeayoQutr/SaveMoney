@@ -169,6 +169,7 @@ class SaveMoneyApiTest(unittest.TestCase):
         original_backup = Path(self.temp_dir.name) / "original_before_restore.db"
         restore_source = Path(self.temp_dir.name) / "restore_source.db"
         shutil.copy2(self.db_path, original_backup)
+        shutil.copy2(self.db_path, restore_source)
 
         connection = sqlite3.connect(restore_source)
         try:
@@ -242,6 +243,14 @@ class SaveMoneyApiTest(unittest.TestCase):
             self.assertEqual(update_response.json()["saved_amount"], 12.35)
         finally:
             db.close()
+
+    def test_error_response_uses_unified_shape(self) -> None:
+        response = self.client.get("/expenses/summary/monthly?month=2026-13")
+
+        self.assertEqual(response.status_code, 422)
+        data = response.json()
+        self.assertEqual(data["error"]["code"], "HTTP_422")
+        self.assertEqual(data["error"]["message"], "month 格式错误，应为 YYYY-MM")
 
     def test_ai_json_parser_accepts_fenced_json(self) -> None:
         from app.utils.ai_json import parse_ai_json_object
