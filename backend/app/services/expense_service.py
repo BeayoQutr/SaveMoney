@@ -1,8 +1,8 @@
 import calendar
-from collections import defaultdict
 from datetime import date
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Expense
@@ -17,7 +17,7 @@ from app.schemas import (
     MonthlyExpenseSummaryResponse,
 )
 from app.utils.date_utils import parse_month, validate_date_range
-from app.utils.money import from_cents, round_money, sum_money, to_cents
+from app.utils.money import from_cents, round_money, to_cents
 
 
 AI_ALLOWED_CATEGORIES = [
@@ -64,6 +64,9 @@ def list_expenses(
     limit: int = 50,
     offset: int = 0,
 ) -> ExpenseListResponse:
+    if start_date is not None and end_date is not None:
+        validate_date_range(start_date, end_date)
+
     query = db.query(Expense)
     if start_date is not None:
         query = query.filter(Expense.date >= start_date)
@@ -148,11 +151,15 @@ def delete_expense(db: Session, expense_id: int) -> ExpenseDeleteResponse:
 
 
 def daily_summary(db: Session, query_date: date) -> DailyExpenseSummaryResponse:
-    rows = db.query(Expense).filter(Expense.date == query_date).all()
+    total_cents, count = (
+        db.query(func.coalesce(func.sum(Expense.amount_cents), 0), func.count(Expense.id))
+        .filter(Expense.date == query_date)
+        .one()
+    )
     return DailyExpenseSummaryResponse(
         date=query_date,
-        total_amount=sum_money([row.amount for row in rows]),
-        count=len(rows),
+        total_amount=from_cents(int(total_cents or 0)),
+        count=count,
     )
 
 
@@ -163,22 +170,23 @@ def category_summary(
 ) -> CategorySummaryResponse:
     validate_date_range(start_date, end_date)
     rows = (
-        db.query(Expense)
+        db.query(
+            Expense.category,
+            func.coalesce(func.sum(Expense.amount_cents), 0).label("total_cents"),
+            func.count(Expense.id).label("expense_count"),
+        )
         .filter(Expense.date >= start_date, Expense.date <= end_date)
+        .group_by(Expense.category)
         .all()
     )
 
-    buckets: dict[str, list[float]] = defaultdict(list)
-    for row in rows:
-        buckets[row.category].append(row.amount)
-
     items = [
         CategorySummaryItem(
-            category=category,
-            total_amount=sum_money(amounts),
-            count=len(amounts),
+            category=row.category,
+            total_amount=from_cents(int(row.total_cents or 0)),
+            count=row.expense_count,
         )
-        for category, amounts in buckets.items()
+        for row in rows
     ]
     items.sort(key=lambda item: item.total_amount, reverse=True)
 
@@ -189,7 +197,7 @@ def monthly_summary(db: Session, month: str) -> MonthlyExpenseSummaryResponse:
     start_date, end_date = parse_month(month)
     days_in_month = calendar.monthrange(start_date.year, start_date.month)[1]
     summary = category_summary(db, start_date, end_date)
-    total = sum_money([item.total_amount for item in summary.items])
+    total = round_money(sum(item.total_amount for item in summary.items))
     count = sum(item.count for item in summary.items)
     average_daily = round_money(total / days_in_month) if days_in_month > 0 else 0.0
 

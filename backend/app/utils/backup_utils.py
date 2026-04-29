@@ -4,12 +4,18 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from app.database import DEFAULT_DATABASE_PATH
+from sqlalchemy.engine import make_url
+
+from app.database import SQLALCHEMY_DATABASE_URL
 
 
 def get_db_path() -> Path:
     """Return the current database file path."""
-    return DEFAULT_DATABASE_PATH
+    url = make_url(SQLALCHEMY_DATABASE_URL)
+    if url.drivername != "sqlite" or url.database in (None, "", ":memory:"):
+        raise ValueError("数据库备份仅支持文件型 SQLite 数据库")
+
+    return Path(url.database).expanduser().resolve()
 
 
 def create_backup() -> Path:

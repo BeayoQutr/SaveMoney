@@ -15,15 +15,18 @@ export function BackupPanel() {
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
-  function handleDownloadDb() {
+  async function handleDownloadDb() {
     setError("");
     setStatus("正在下载数据库备份...");
+    setLoading(true);
     try {
-      apiClient.downloadDbBackup();
+      await apiClient.downloadDbBackup();
       setStatus("数据库下载已开始，请查看浏览器下载列表");
     } catch (err) {
       setError(getErrorMessage(err, "下载失败"));
       setStatus("");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -79,8 +82,9 @@ export function BackupPanel() {
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <button
           type="button"
-          onClick={handleDownloadDb}
-          className="min-h-12 rounded-lg bg-emerald-500 px-4 font-semibold text-black"
+          disabled={loading}
+          onClick={() => void handleDownloadDb()}
+          className="min-h-12 rounded-lg bg-emerald-500 px-4 font-semibold text-black disabled:opacity-60"
         >
           下载数据库备份
         </button>

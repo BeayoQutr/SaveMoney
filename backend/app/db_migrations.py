@@ -35,3 +35,17 @@ def ensure_sqlite_schema_compatibility(engine: Engine) -> None:
                             f"ADD COLUMN {column_name} {column_type}"
                         )
                     )
+
+        expense_columns = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(expenses)")).fetchall()
+        }
+        if {"amount", "amount_cents"}.issubset(expense_columns):
+            conn.execute(
+                text(
+                    """
+                    UPDATE expenses
+                    SET amount_cents = CAST(ROUND(amount * 100) AS INTEGER)
+                    WHERE amount_cents IS NULL AND amount IS NOT NULL
+                    """
+                )
+            )

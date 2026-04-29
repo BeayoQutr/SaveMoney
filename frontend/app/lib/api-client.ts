@@ -166,15 +166,23 @@ export const apiClient = {
       body: JSON.stringify({ note }),
     });
   },
-  downloadDbBackup() {
-    const token = process.env.NEXT_PUBLIC_SAVEMONEY_ACCESS_TOKEN;
-    const url = `${API_BASE_URL}/backup/download-db`;
+  async downloadDbBackup() {
+    const response = await fetch(`${API_BASE_URL}/backup/download-db`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new ApiError(await readError(response, "数据库下载失败"), response.status);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = token ? `${url}?token=${token}` : url;
+    a.href = objectUrl;
     a.download = "savemoney.db";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
   },
 
   async restoreDb(file: File) {

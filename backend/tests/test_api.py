@@ -14,6 +14,7 @@ class SaveMoneyApiTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.temp_dir = tempfile.TemporaryDirectory()
         db_path = Path(cls.temp_dir.name) / "test.db"
+        cls.db_path = db_path
         os.environ["SAVEMONEY_DATABASE_URL"] = f"sqlite:///{db_path.as_posix()}"
 
         from app.main import app
@@ -129,6 +130,11 @@ class SaveMoneyApiTest(unittest.TestCase):
         self.assertIn("午餐", csv_response.text)
 
     def test_date_ranges_must_be_ordered(self) -> None:
+        list_response = self.client.get(
+            "/expenses?start_date=2026-04-30&end_date=2026-04-01"
+        )
+        self.assertEqual(list_response.status_code, 422)
+
         category_response = self.client.get(
             "/expenses/summary/category?start_date=2026-04-30&end_date=2026-04-01"
         )
@@ -142,6 +148,18 @@ class SaveMoneyApiTest(unittest.TestCase):
     def test_invalid_month_returns_422(self) -> None:
         response = self.client.get("/expenses/summary/monthly?month=2026-13")
         self.assertEqual(response.status_code, 422)
+
+    def test_expense_list_pagination_is_bounded(self) -> None:
+        negative_offset = self.client.get("/expenses?offset=-1")
+        self.assertEqual(negative_offset.status_code, 422)
+
+        excessive_limit = self.client.get("/expenses?limit=201")
+        self.assertEqual(excessive_limit.status_code, 422)
+
+    def test_backup_uses_configured_sqlite_database_path(self) -> None:
+        from app.utils.backup_utils import get_db_path
+
+        self.assertEqual(get_db_path(), self.db_path.resolve())
 
     def test_ai_json_parser_accepts_fenced_json(self) -> None:
         from app.utils.ai_json import parse_ai_json_object
@@ -207,6 +225,12 @@ class SaveMoneyApiTest(unittest.TestCase):
                 )
                 """
             )
+            connection.execute(
+                """
+                INSERT INTO expenses (amount, note, date, category)
+                VALUES (12.345, '午餐', '2026-04-29', '餐饮')
+                """
+            )
             connection.commit()
         finally:
             connection.close()
@@ -217,10 +241,14 @@ class SaveMoneyApiTest(unittest.TestCase):
             with engine.connect() as conn:
                 rows = conn.execute(text("PRAGMA table_info(expenses)")).fetchall()
                 columns = {row[1] for row in rows}
+                cents = conn.execute(
+                    text("SELECT amount_cents FROM expenses WHERE note = '午餐'")
+                ).scalar_one()
 
             self.assertIn("amount_cents", columns)
             self.assertIn("payment_method", columns)
             self.assertIn("is_necessary", columns)
+            self.assertEqual(cents, 1235)
         finally:
             engine.dispose()
 
