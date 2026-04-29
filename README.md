@@ -2,55 +2,59 @@
 
 一个用于攒钱计划生成、消费记录、消费分析和 AI 辅助记账的 Web 全栈项目。
 
-这是我做的完整学习项目，从前端到后端到数据库到 AI 接入，涵盖了一个 Web 应用的各个环节。代码放在 GitHub 上公开，主要用于学习、展示和个人使用。
-
-## 项目定位
-
-当前版本是 **Web 全栈版**，前端用 Next.js，后端用 FastAPI + SQLite，适合在电脑浏览器上使用和调试。
-
-这不是 Android APK 版本。如果后面想做手机 App，会单独开一个原生 Android 项目重新实现，本仓库保持 Web 版本。
+当前版本是 **Web 全栈版**，前端使用 Next.js + React + TypeScript + Tailwind CSS，后端使用 FastAPI + SQLite + SQLAlchemy + Pydantic。项目适合在电脑和手机浏览器中使用，也适合作为完整 Web 全栈学习项目。
 
 ## 已完成功能
 
-- 攒钱计划生成（根据收入、支出、目标、截止日期计算每日存钱金额）
-- 常用信息保存（月收入、固定支出等存到浏览器 localStorage）
-- 消费记录入库（金额、备注、日期、分类写入数据库）
-- 消费记录列表展示（最近记录，含编辑和删除按钮）
-- 编辑消费记录
-- 删除消费记录
-- 每日消费汇总（按日期查询消费总额和笔数）
-- 消费分类统计（按日期范围统计各类别金额和笔数）
-- 本月总览（本月总消费、日均消费、分类明细）
-- 动态调整攒钱计划（已攒金额和今日消费动态调整每日需存）
+- 快速记录消费：金额、备注、日期、分类
+- 消费记录列表展示、编辑、删除
+- 每日消费汇总
+- 按日期范围统计消费分类
+- 本月总览：总消费、消费笔数、日均消费、分类明细
 - CSV 导出消费记录
-- AI 月度消费分析（调用 DeepSeek 生成本月消费报告）
-- AI 消费分类建议（根据金额和备注自动推荐分类）
-- AI 分类结果入库（分类推荐结果随消费记录写入数据库）
-- AI 分类防重复请求（相同金额和备注不重复请求 AI）
-- AI 消费备注优化（优化消费备注文本，让记录更简洁规范）
-- 前后端分离架构
-- SQLite 本地数据库
-- DeepSeek API 接入
+- 攒钱计划生成：根据收入、固定支出、目标和截止日期计算每日需存
+- 动态调整攒钱计划
+- 常用收入和支出信息保存到浏览器 localStorage
+- AI 月度消费分析
+- AI 消费分类建议，失败时回退本地规则
+- AI 消费备注优化
 - 后端接口回归测试
-- 前端 lint 和生产构建检查
+- GitHub Actions 基础 CI
 
 ## 技术栈
 
 - **前端**：Next.js / React / TypeScript / Tailwind CSS
-- **后端**：FastAPI / Python
+- **后端**：FastAPI / Python / SQLAlchemy / Pydantic
 - **数据库**：SQLite
 - **AI**：DeepSeek API
-- **版本管理**：Git / GitHub
+- **测试与质量**：pytest / unittest 兼容测试、ESLint、Next build、GitHub Actions
 
-## 稳定性与工程化
+## 项目结构
 
-- 后端数据库默认固定到 `backend/savemoney.db`，避免从不同目录启动时生成多个数据库文件
-- 支持通过 `SAVEMONEY_DATABASE_URL` 指定数据库连接，便于测试和临时环境隔离
-- 消费记录和 AI 请求增加输入清洗与校验，避免空备注、非法金额和过长文本进入业务逻辑
-- 分类统计和 CSV 导出会校验日期范围，开始日期晚于结束日期时返回明确错误
-- AI JSON 返回增加容错解析，可兼容模型返回 Markdown 代码块包裹 JSON 的情况
-- 新增后端回归测试，覆盖消费记录 CRUD、日期范围校验、月份参数校验和 AI JSON 解析
-- 前端页面元信息已改为项目名称，页面语言标记为 `zh-CN`
+```text
+SaveMoney/
+├─ backend/
+│  ├─ app/
+│  │  ├─ routers/          # FastAPI 路由
+│  │  ├─ services/         # 业务逻辑
+│  │  ├─ utils/            # 日期、金额、CSV 等工具
+│  │  ├─ main.py           # 创建 app、注册 CORS 和 routers
+│  │  ├─ models.py         # SQLAlchemy 模型
+│  │  ├─ schemas.py        # Pydantic 入参/出参
+│  │  └─ budget_engine.py  # 攒钱计划计算
+│  ├─ tests/               # 后端测试
+│  └─ requirements.txt
+├─ frontend/
+│  ├─ app/
+│  │  ├─ components/       # 页面组件
+│  │  ├─ hooks/            # 前端 hooks
+│  │  ├─ lib/              # API 客户端
+│  │  ├─ page.tsx          # 页面组合入口
+│  │  └─ types.ts          # TypeScript 类型
+│  └─ package.json
+├─ docs/images/            # 项目截图
+└─ .github/workflows/ci.yml
+```
 
 ## 本地运行
 
@@ -61,7 +65,7 @@
 ```bash
 # 后端依赖
 cd backend
-pip install -r requirements.txt
+pip install -r requirements.txt pytest
 
 # 前端依赖
 cd frontend
@@ -72,23 +76,33 @@ npm install
 
 在 `backend/` 目录下创建 `.env` 文件，内容参考 `backend/.env.example`：
 
-```
+```text
 DEEPSEEK_API_KEY=你的DeepSeek_API_Key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 ```
 
-没有配置 API Key 也可以正常使用攒钱计划、消费记录等基础功能，只是 AI 相关功能（AI 月度分析、AI 分类建议、AI 备注优化）会返回服务不可用。
+没有配置 API Key 也可以正常使用攒钱计划、消费记录、统计和 CSV 导出等基础功能。
 
 ### 3. 启动后端
 
-```bash
+```powershell
 cd backend
-.\\.venv\\Scripts\\Activate.ps1   # Windows PowerShell
+.\.venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-后端跑在 `http://127.0.0.1:8000`，接口文档在 `http://127.0.0.1:8000/docs`。
+后端地址：
+
+```text
+http://127.0.0.1:8000
+```
+
+接口文档：
+
+```text
+http://127.0.0.1:8000/docs
+```
 
 ### 4. 启动前端
 
@@ -97,16 +111,23 @@ cd frontend
 npm run dev
 ```
 
-前端跑在 `http://localhost:3000`，启动后自动连接后端。
+前端地址：
 
-### 5. 运行检查
+```text
+http://localhost:3000
+```
+
+## 运行检查
 
 ```bash
-# 后端回归测试
+# 后端测试
 cd backend
+pytest
+
+# 如果本地没有安装 pytest，也可以先用当前兼容测试方式：
 python -m unittest discover -s tests -v
 
-# 前端代码检查和生产构建
+# 前端检查
 cd frontend
 npm run lint
 npm run build
@@ -124,11 +145,43 @@ npm run build
 
 请勿将真实 API Key 提交到 Git。`backend/.env` 已在 `.gitignore` 中。
 
+## 稳定性与工程化
+
+- 后端 `main.py` 只负责创建 app、注册 CORS 和 routers
+- 后端业务逻辑拆分到 `routers/`、`services/`、`utils/`
+- 前端 `page.tsx` 只负责组合组件和页面级刷新状态
+- 前端类型、API 请求、localStorage 逻辑已独立封装
+- 首屏优先展示“记一笔消费”，按钮和输入框适配移动端操作
+- AI 分类失败时回退本地规则，普通记账不依赖 AI
+- AI JSON 返回支持 Markdown 代码块容错解析
+- 生产环境不打印 API key 或完整 AI 响应
+- 金额处理集中封装为 Decimal 边界处理，避免到处直接操作 float
+
+## 金额精度说明
+
+当前数据库沿用已有的 `amount` 字段，以“元”为单位保存。为了避免破坏已有 SQLite 数据，本次没有直接迁移为 `amount_cents` 字段，而是在服务层增加金额处理工具，统一进行 Decimal 舍入和统计。
+
+如果后续要迁移到“分”为单位保存，建议步骤：
+
+1. 备份 `backend/savemoney.db`
+2. 新增 `amount_cents` 整数字段
+3. 写一次性迁移脚本，将旧 `amount` 转换为 `round(amount * 100)`
+4. API 继续对外接收和返回“元”
+5. 验证统计、导出和编辑功能后，再移除旧字段
+
 ## 数据存储说明
 
-消费记录保存在本地 SQLite 数据库中，文件路径是 `backend/savemoney.db`。常用信息保存在浏览器的 localStorage 中。这两个存储位置都已在 `.gitignore` 中，不会上传到 GitHub。
+消费记录保存在本地 SQLite 数据库中：
+
+```text
+backend/savemoney.db
+```
+
+常用信息（月收入、固定支出、最低生活费、身份）保存在浏览器 localStorage 中。数据库文件和环境变量文件都已加入 `.gitignore`，不会提交到 GitHub。
 
 ## 项目截图
+
+截图位于 `docs/images/`，用于展示当前 Web 版核心页面。后续如果界面继续调整，可以替换同名图片保持 README 展示同步。
 
 ![攒钱计划](docs/images/home1.png)
 
@@ -138,18 +191,38 @@ npm run build
 
 ![AI 月度分析](docs/images/home4.png)
 
+## 常见问题
+
+### 前端提示后端未响应
+
+请确认后端已启动，并能访问：
+
+```text
+http://127.0.0.1:8000/health
+```
+
+如果后端端口不是 8000，请在 `frontend/.env.local` 设置 `NEXT_PUBLIC_API_BASE_URL`。
+
+### AI 服务不可用
+
+AI 月度分析、AI 分类建议和 AI 备注优化需要在 `backend/.env` 配置 `DEEPSEEK_API_KEY`。未配置时，普通记账、查询、导出仍可使用；AI 分类会尽量回退到本地规则。
+
+### 数据库文件在哪里
+
+默认数据库文件是 `backend/savemoney.db`。迁移或重装环境前建议先备份。
+
 ## 后续计划
 
-- 根据需要优化页面细节
-- 拆分前端大页面组件，提升长期维护性
-- 增加更多预算分析维度和测试覆盖
+- 继续增强预算分析维度
+- 增加前端组件测试
+- 提供 SQLite 金额字段迁移脚本
 - 如果需要移动端，单独开发 Android 原生版
 
 ## 注意事项
 
 - 本项目主要用于个人学习和作品展示
 - AI 结果仅作为辅助参考，不一定完全准确
-- 不要提交 `.env` 和真实 API Key
+- 不要提交 `.env`、真实 API Key 或本地数据库文件
 
 ## 许可证
 

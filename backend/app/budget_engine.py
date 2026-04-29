@@ -91,6 +91,19 @@ def generate_saving_plan(data: GeneratePlanRequest) -> GeneratePlanResponse:
 
 def adjust_saving_plan(data: AdjustPlanRequest) -> AdjustPlanResponse:
     remaining_amount = round(data.target_amount - data.saved_amount, 2)
+
+    if remaining_amount <= 0:
+        new_daily_saving = 0.0
+        adjustment_per_day = round(-data.planned_daily_saving, 2)
+        return AdjustPlanResponse(
+            remaining_amount=remaining_amount,
+            today_gap=0.0,
+            new_daily_saving=new_daily_saving,
+            adjustment_per_day=adjustment_per_day,
+            status="ok",
+            message="目标已达成，无需继续攒钱",
+        )
+
     actual_saving_today = max(data.daily_available - data.actual_expense_today, 0)
     actual_saving_today = round(actual_saving_today, 2)
     today_gap = round(data.planned_daily_saving - actual_saving_today, 2)
