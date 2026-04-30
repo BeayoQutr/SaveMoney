@@ -201,10 +201,12 @@ http://127.0.0.1:8000/docs
 
 ### 4. 启动前端
 
-```bash
+```powershell
 cd frontend
 npm run dev
 ```
+
+前端已默认使用 webpack 启动 Next 开发服务器，避免 Turbopack 在部分 Windows 电脑上导致高 CPU/内存占用。
 
 前端地址：
 
