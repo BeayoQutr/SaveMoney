@@ -6,5 +6,8 @@ backend/.env
 node_modules/
 frontend/.next/
 frontend/.test-build/
+frontend/test-results/
+test-results/
+/package-lock.json
 
 backend/savemoney.db
