@@ -1,36 +1,50 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiClient } from "../lib/api-client";
 
-export function BackendStatus() {
+type BackendStatusProps = {
+  onChecked?: () => void;
+};
+
+export function BackendStatus({ onChecked }: BackendStatusProps) {
   const [online, setOnline] = useState<boolean | null>(null);
   const [aiReady, setAiReady] = useState<boolean | null>(null);
   const [message, setMessage] = useState("正在检测后端连接...");
+  const abortRef = useRef<AbortController | null>(null);
 
-  const checkBackend = useCallback(async () => {
+  const checkBackend = useCallback(async (signal?: AbortSignal) => {
     setOnline(null);
     setAiReady(null);
     setMessage("正在检测后端连接...");
     try {
-      await apiClient.health();
+      await apiClient.health(signal);
       setOnline(true);
       try {
-        const ai = await apiClient.aiStatus();
+        const ai = await apiClient.aiStatus(signal);
         setAiReady(ai.ai_configured);
       } catch {
         setAiReady(false);
       }
       setMessage("后端已连接，可以正常记账");
     } catch {
+      if (signal?.aborted) return;
       setOnline(false);
       setMessage("后端未响应，请先启动 FastAPI 服务");
+    } finally {
+      onChecked?.();
     }
   }, []);
 
   useEffect(() => {
-    void Promise.resolve().then(checkBackend);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void Promise.resolve().then(() => checkBackend(controller.signal));
+    return () => {
+      controller.abort();
+    };
   }, [checkBackend]);
 
   const statusClass =
@@ -56,7 +70,12 @@ export function BackendStatus() {
         </div>
         <button
           type="button"
-          onClick={() => void checkBackend()}
+          onClick={() => {
+            abortRef.current?.abort();
+            const controller = new AbortController();
+            abortRef.current = controller;
+            void checkBackend(controller.signal);
+          }}
           className="min-h-11 rounded-lg border border-current px-4 py-2 font-medium"
         >
           重新检测

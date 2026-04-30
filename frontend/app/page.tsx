@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { BackendStatus } from "./components/BackendStatus";
 import { BackupPanel } from "./components/BackupPanel";
@@ -12,6 +12,11 @@ import { PlanForm } from "./components/PlanForm";
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [backendChecked, setBackendChecked] = useState(false);
+
+  const handleBackendChecked = useCallback(() => {
+    setBackendChecked(true);
+  }, []);
 
   function notifyDataChanged() {
     setRefreshKey((value) => value + 1);
@@ -28,23 +33,27 @@ export default function Home() {
           </p>
         </header>
 
-        <BackendStatus />
+        <BackendStatus onChecked={handleBackendChecked} />
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(380px,460px)]">
-          <div className="grid min-w-0 gap-5">
-            <ExpenseForm onChanged={notifyDataChanged} />
-            <MonthlySummary refreshKey={refreshKey} />
-          </div>
+        {backendChecked && (
+          <>
+            <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(380px,460px)]">
+              <div className="grid min-w-0 gap-5">
+                <ExpenseForm onChanged={notifyDataChanged} />
+                <MonthlySummary refreshKey={refreshKey} />
+              </div>
 
-          <div className="grid min-w-0 content-start gap-5">
-            <ExpenseList refreshKey={refreshKey} onChanged={notifyDataChanged} />
-            <ExportPanel />
-          </div>
-        </section>
+              <div className="grid min-w-0 content-start gap-5">
+                <ExpenseList refreshKey={refreshKey} onChanged={notifyDataChanged} />
+                <ExportPanel />
+              </div>
+            </section>
 
-        <PlanForm refreshKey={refreshKey} />
+            <PlanForm refreshKey={refreshKey} />
 
-        <BackupPanel onChanged={notifyDataChanged} />
+            <BackupPanel onChanged={notifyDataChanged} />
+          </>
+        )}
 
         <section className="rounded-lg border border-gray-800 p-4 text-sm text-gray-300">
           <h2 className="font-semibold text-gray-100">数据存储说明</h2>

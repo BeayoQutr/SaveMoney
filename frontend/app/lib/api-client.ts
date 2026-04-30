@@ -49,14 +49,18 @@ async function readError(response: Response, fallback: string) {
   return fallback;
 }
 
+const DEFAULT_TIMEOUT_MS = 10000;
+
 async function requestJson<T>(
   path: string,
-  init?: RequestInit,
+  init?: RequestInit & { signal?: AbortSignal },
   fallback = "请求失败"
 ): Promise<T> {
   const authHeaders = getAuthHeaders();
+  const { signal: externalSignal, ...restInit } = init || {};
   const mergedInit: RequestInit = {
-    ...init,
+    ...restInit,
+    signal: externalSignal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     headers: {
       ...authHeaders,
       ...(init?.headers as Record<string, string>),
@@ -69,9 +73,10 @@ async function requestJson<T>(
   return response.json() as Promise<T>;
 }
 
-async function requestBlob(path: string, fallback: string): Promise<Blob> {
+async function requestBlob(path: string, fallback: string, signal?: AbortSignal): Promise<Blob> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: getAuthHeaders(),
+    signal: signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new ApiError(await readError(response, fallback), response.status);
@@ -98,11 +103,11 @@ async function uploadJson<T>(
 }
 
 export const apiClient = {
-  health() {
-    return requestJson<{ status: string }>("/health");
+  health(signal?: AbortSignal) {
+    return requestJson<{ status: string }>("/health", { signal });
   },
-  aiStatus() {
-    return requestJson<{ ai_configured: boolean }>("/ai/status");
+  aiStatus(signal?: AbortSignal) {
+    return requestJson<{ ai_configured: boolean }>("/ai/status", { signal });
   },
   generatePlan(payload: GeneratePlanPayload) {
     return requestJson<PlanResult>("/plans/generate", {
@@ -118,8 +123,8 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
   },
-  getCurrentPlan() {
-    return requestJson<SavingPlanCurrentResponse>("/plans/current");
+  getCurrentPlan(signal?: AbortSignal) {
+    return requestJson<SavingPlanCurrentResponse>("/plans/current", { signal });
   },
   updatePlanSavedAmount(planId: number, savedAmount: number) {
     return requestJson("/plans/" + planId, {
@@ -128,14 +133,17 @@ export const apiClient = {
       body: JSON.stringify({ saved_amount: savedAmount }),
     });
   },
-  listExpenses(filters?: {
-    startDate?: string;
-    endDate?: string;
-    category?: string;
-    keyword?: string;
-    limit?: number;
-    offset?: number;
-  }) {
+  listExpenses(
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+      category?: string;
+      keyword?: string;
+      limit?: number;
+      offset?: number;
+    },
+    signal?: AbortSignal
+  ) {
     const params = new URLSearchParams();
     if (filters?.startDate) params.set("start_date", filters.startDate);
     if (filters?.endDate) params.set("end_date", filters.endDate);
@@ -144,7 +152,7 @@ export const apiClient = {
     if (filters?.limit !== undefined) params.set("limit", String(filters.limit));
     if (filters?.offset !== undefined) params.set("offset", String(filters.offset));
     const qs = params.toString();
-    return requestJson<ExpenseListResponse>(`/expenses${qs ? `?${qs}` : ""}`);
+    return requestJson<ExpenseListResponse>(`/expenses${qs ? `?${qs}` : ""}`, { signal });
   },
   createExpense(payload: ExpensePayload) {
     return requestJson<ExpenseResult>("/expenses", {
@@ -175,9 +183,9 @@ export const apiClient = {
       `/expenses/summary/category?${params.toString()}`
     );
   },
-  monthlySummary(month: string) {
+  monthlySummary(month: string, signal?: AbortSignal) {
     const params = new URLSearchParams({ month });
-    return requestJson<MonthlySummary>(`/expenses/summary/monthly?${params.toString()}`);
+    return requestJson<MonthlySummary>(`/expenses/summary/monthly?${params.toString()}`, { signal });
   },
   aiMonthlyAdvice(month: string) {
     const params = new URLSearchParams({ month });
