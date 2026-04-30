@@ -42,9 +42,9 @@ export default function Home() {
           </div>
         </section>
 
-        <PlanForm />
+        <PlanForm refreshKey={refreshKey} />
 
-        <BackupPanel />
+        <BackupPanel onChanged={notifyDataChanged} />
 
         <section className="rounded-lg border border-gray-800 p-4 text-sm text-gray-300">
           <h2 className="font-semibold text-gray-100">数据存储说明</h2>

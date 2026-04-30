@@ -46,3 +46,23 @@ test("api client falls back when error body is not JSON", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("api client persists saved amount updates", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { url: string; init?: RequestInit }[] = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: String(input), init });
+    return new Response(JSON.stringify({ id: 7, saved_amount: 12.35 }), { status: 200 });
+  };
+
+  try {
+    await apiClient.updatePlanSavedAmount(7, 12.35);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.endsWith("/plans/7"), true);
+  assert.equal(calls[0].init?.method, "PUT");
+  assert.equal(calls[0].init?.body, JSON.stringify({ saved_amount: 12.35 }));
+});

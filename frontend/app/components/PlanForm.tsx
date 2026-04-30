@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { usePreset } from "../hooks/usePreset";
 import { apiClient, ApiError } from "../lib/api-client";
@@ -11,7 +11,11 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message || fallback : fallback;
 }
 
-export function PlanForm() {
+type PlanFormProps = {
+  refreshKey: number;
+};
+
+export function PlanForm({ refreshKey }: PlanFormProps) {
   const { preset, setField, savePreset, clearPreset, message } = usePreset();
   const [targetAmount, setTargetAmount] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -21,9 +25,13 @@ export function PlanForm() {
   const [savedAmount, setSavedAmount] = useState("");
   const [currentPlan, setCurrentPlan] = useState<SavingPlanCurrentResponse | null>(null);
 
-  useEffect(() => {
-    void apiClient.getCurrentPlan().then(setCurrentPlan).catch(() => {});
+  const fetchCurrentPlan = useCallback(async () => {
+    setCurrentPlan(await apiClient.getCurrentPlan());
   }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchCurrentPlan).catch(() => {});
+  }, [fetchCurrentPlan, refreshKey]);
   const [actualExpenseToday, setActualExpenseToday] = useState("");
   const [adjustResult, setAdjustResult] = useState<AdjustResult | null>(null);
   const [adjustError, setAdjustError] = useState("");
@@ -60,6 +68,7 @@ export function PlanForm() {
         identity: preset.identity,
       });
       setResult(data);
+      await fetchCurrentPlan();
     } catch (err) {
       setError(getErrorMessage(err, "生成失败，请确认后端已启动"));
     } finally {
@@ -93,6 +102,10 @@ export function PlanForm() {
         daily_available: result.daily_available,
       });
       setAdjustResult(data);
+      if (currentPlan?.plan) {
+        await apiClient.updatePlanSavedAmount(currentPlan.plan.id, saved);
+        await fetchCurrentPlan();
+      }
     } catch (err) {
       setAdjustError(getErrorMessage(err, "调整失败，请确认后端已启动"));
     } finally {
