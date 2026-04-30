@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { apiClient, ApiError } from "../app/lib/api-client";
+import { apiClient, ApiError } from "../../app/lib/api-client";
 
 test("api client parses unified error responses", async () => {
   const originalFetch = globalThis.fetch;
