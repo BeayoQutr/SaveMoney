@@ -145,6 +145,35 @@ class SaveMoneyApiTest(unittest.TestCase):
         self.assertIn("10.10,午餐,2026-04-10,餐饮", csv_response.text)
         self.assertIn("午餐", csv_response.text)
 
+    def test_expense_list_and_csv_prefer_cents_for_legacy_rows(self) -> None:
+        from app.database import SessionLocal
+        from app.models import Expense
+
+        db = SessionLocal()
+        try:
+            db.add(
+                Expense(
+                    amount=12.345,
+                    amount_cents=1235,
+                    note="旧金额",
+                    date=date(2026, 4, 10),
+                    category="其他",
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        list_response = self.client.get("/expenses?limit=10")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["items"][0]["amount"], 12.35)
+
+        csv_response = self.client.get(
+            "/expenses/export/csv?start_date=2026-04-01&end_date=2026-04-30"
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn("12.35,旧金额,2026-04-10,其他", csv_response.text)
+
     def test_monthly_summary_empty_month_returns_zero_state(self) -> None:
         monthly = self.client.get("/expenses/summary/monthly?month=2026-04")
 
@@ -322,6 +351,48 @@ class SaveMoneyApiTest(unittest.TestCase):
             self.assertEqual(update_response.json()["saved_amount"], 12.35)
         finally:
             db.close()
+
+    def test_invalid_and_impossible_saving_plans_are_not_persisted(self) -> None:
+        from app.database import SessionLocal
+        from app.models import SavingPlan
+
+        invalid_response = self.client.post(
+            "/plans/generate",
+            json={
+                "monthly_income": 5000,
+                "fixed_expenses": 1000,
+                "target_amount": 1000,
+                "deadline": (date.today() - timedelta(days=1)).isoformat(),
+                "identity": "worker",
+                "minimum_living_cost": 1000,
+            },
+        )
+        impossible_response = self.client.post(
+            "/plans/generate",
+            json={
+                "monthly_income": 1000,
+                "fixed_expenses": 1000,
+                "target_amount": 1000,
+                "deadline": (date.today() + timedelta(days=10)).isoformat(),
+                "identity": "worker",
+                "minimum_living_cost": 1000,
+            },
+        )
+
+        self.assertEqual(invalid_response.status_code, 200)
+        self.assertEqual(invalid_response.json()["status"], "invalid")
+        self.assertEqual(impossible_response.status_code, 200)
+        self.assertEqual(impossible_response.json()["status"], "impossible")
+
+        db = SessionLocal()
+        try:
+            self.assertEqual(db.query(SavingPlan).count(), 0)
+        finally:
+            db.close()
+
+        current = self.client.get("/plans/current")
+        self.assertEqual(current.status_code, 200)
+        self.assertIsNone(current.json()["plan"])
 
     def test_current_saving_plan_returns_calculated_progress(self) -> None:
         deadline = date.today() + timedelta(days=10)

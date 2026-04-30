@@ -13,6 +13,7 @@ from app.schemas import (
     ExpenseCreateRequest,
     ExpenseCreateResponse,
     ExpenseDeleteResponse,
+    ExpenseItemResponse,
     ExpenseListResponse,
     MonthlyExpenseSummaryResponse,
 )
@@ -30,6 +31,24 @@ AI_ALLOWED_CATEGORIES = [
     "生活",
     "其他",
 ]
+
+
+def _expense_amount(expense: Expense) -> float:
+    if expense.amount_cents is not None:
+        return from_cents(expense.amount_cents)
+    return round_money(expense.amount)
+
+
+def _expense_item(expense: Expense) -> ExpenseItemResponse:
+    return ExpenseItemResponse(
+        id=expense.id,
+        amount=_expense_amount(expense),
+        note=expense.note,
+        date=expense.date,
+        category=expense.category,
+        payment_method=expense.payment_method,
+        is_necessary=expense.is_necessary,
+    )
 
 
 def classify_expense(note: str) -> str:
@@ -77,7 +96,8 @@ def list_expenses(
     if keyword is not None:
         query = query.filter(Expense.note.contains(keyword))
     total = query.count()
-    items = query.order_by(Expense.date.desc(), Expense.id.desc()).offset(offset).limit(limit).all()
+    rows = query.order_by(Expense.date.desc(), Expense.id.desc()).offset(offset).limit(limit).all()
+    items = [_expense_item(expense) for expense in rows]
     return ExpenseListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
@@ -97,7 +117,7 @@ def create_expense(db: Session, data: ExpenseCreateRequest) -> ExpenseCreateResp
     db.refresh(expense)
     return ExpenseCreateResponse(
         id=expense.id,
-        amount=round_money(expense.amount),
+        amount=_expense_amount(expense),
         note=expense.note,
         date=expense.date,
         category=expense.category,
@@ -130,7 +150,7 @@ def update_expense(
 
     return ExpenseCreateResponse(
         id=expense.id,
-        amount=round_money(expense.amount),
+        amount=_expense_amount(expense),
         note=expense.note,
         date=expense.date,
         category=expense.category,

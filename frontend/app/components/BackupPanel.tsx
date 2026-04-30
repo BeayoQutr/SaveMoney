@@ -5,7 +5,11 @@ import { useRef, useState } from "react";
 import { apiClient } from "../lib/api-client";
 import { getUploadFailureMessage } from "../lib/ui-logic";
 
-export function BackupPanel() {
+type BackupPanelProps = {
+  onChanged?: () => void;
+};
+
+export function BackupPanel({ onChanged }: BackupPanelProps) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,7 @@ export function BackupPanel() {
     try {
       const result = await apiClient.restoreDb(file);
       setStatus(`${result.message}（已自动备份旧库）`);
+      onChanged?.();
     } catch (err) {
       setError(getUploadFailureMessage(err, "数据库恢复失败"));
       setStatus("");
@@ -57,6 +62,7 @@ export function BackupPanel() {
     try {
       const result = await apiClient.importCsv(file);
       setStatus(`${result.message}（已自动备份旧库）`);
+      onChanged?.();
     } catch (err) {
       setError(getUploadFailureMessage(err, "CSV 导入失败"));
       setStatus("");

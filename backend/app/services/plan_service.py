@@ -7,11 +7,9 @@ from sqlalchemy.orm import Session
 from app.models import SavingPlan
 from app.schemas import (
     GeneratePlanRequest,
-    GeneratePlanResponse,
     SavingPlanCurrentResponse,
     SavingPlanItemResponse,
 )
-from app.budget_engine import generate_saving_plan
 from app.utils.money import from_cents, round_money, to_cents
 
 

@@ -20,9 +20,10 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 
 @router.post("/generate", response_model=GeneratePlanResponse)
 def generate_plan(data: GeneratePlanRequest, db: Session = Depends(get_db)):
-    # Persist the plan
-    plan_service.generate_and_save_plan(db, data)
-    return generate_saving_plan(data)
+    result = generate_saving_plan(data)
+    if result.status not in {"invalid", "impossible"}:
+        plan_service.generate_and_save_plan(db, data)
+    return result
 
 
 @router.post("/adjust", response_model=AdjustPlanResponse)

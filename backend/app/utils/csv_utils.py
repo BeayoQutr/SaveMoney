@@ -5,7 +5,13 @@ from datetime import date
 from fastapi.responses import Response
 
 from app.models import Expense
-from app.utils.money import round_money
+from app.utils.money import from_cents, round_money
+
+
+def _export_amount(expense: Expense) -> float:
+    if expense.amount_cents is not None:
+        return from_cents(expense.amount_cents)
+    return round_money(expense.amount)
 
 
 def build_expenses_csv_response(
@@ -20,7 +26,7 @@ def build_expenses_csv_response(
         writer.writerow(
             [
                 expense.id,
-                f"{round_money(expense.amount):.2f}",
+                f"{_export_amount(expense):.2f}",
                 expense.note,
                 expense.date.isoformat(),
                 expense.category,
