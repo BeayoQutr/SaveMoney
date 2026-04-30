@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ApiError } from "../app/lib/api-client";
+import { ApiError } from "../../app/lib/api-client";
 import {
   buildExpenseListFilters,
   generateMonthlyAdvice,
@@ -10,7 +10,7 @@ import {
   getUploadFailureMessage,
   validateExpenseForm,
   validatePlanForm,
-} from "../app/lib/ui-logic";
+} from "../../app/lib/ui-logic";
 
 test("ExpenseForm validation rejects invalid amount, note, and date", () => {
   assert.equal(

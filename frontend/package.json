@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/api-error.test.js .test-build/tests/api-client.test.js .test-build/tests/ui-logic.test.js"
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/unit/api-error.test.js .test-build/tests/unit/api-client.test.js .test-build/tests/unit/ui-logic.test.js",
+    "test:e2e": "playwright test tests/e2e"
   },
   "dependencies": {
     "next": "16.2.4",
@@ -15,6 +16,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
