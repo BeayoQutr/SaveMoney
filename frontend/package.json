@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/api-error.test.js .test-build/tests/api-client.test.js .test-build/tests/ui-logic.test.js"
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/api-error.test.js .test-build/tests/api-client.test.js .test-build/tests/ui-logic.test.js",
+    "e2e": "npx playwright test",
+    "e2e:report": "npx playwright show-report"
   },
   "dependencies": {
     "next": "16.2.4",
