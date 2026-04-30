@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 .env
 backend/.env
-frontend/node_modules/
+node_modules/
 frontend/.next/
 frontend/.test-build/
 
