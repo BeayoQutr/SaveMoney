@@ -9,5 +9,6 @@
     "types": ["node"],
     "incremental": false
   },
-  "include": ["app/lib/**/*.ts", "app/types.ts", "tests/**/*.ts"]
+  "include": ["app/lib/**/*.ts", "app/types.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", ".next", ".test-build"]
 }
