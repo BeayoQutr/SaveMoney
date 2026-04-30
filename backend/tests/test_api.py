@@ -3,6 +3,7 @@ import shutil
 import sqlite3
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -122,14 +123,42 @@ class SaveMoneyApiTest(unittest.TestCase):
 
         monthly = self.client.get("/expenses/summary/monthly?month=2026-04")
         self.assertEqual(monthly.status_code, 200)
-        self.assertGreaterEqual(monthly.json()["total_amount"], 12.45)
+        monthly_data = monthly.json()
+        self.assertEqual(monthly_data["total_amount"], 12.45)
+        self.assertEqual(monthly_data["count"], 2)
+        self.assertEqual(monthly_data["average_daily_amount"], 0.42)
+        self.assertEqual(
+            [item["category"] for item in monthly_data["items"]],
+            ["餐饮", "交通"],
+        )
 
         csv_response = self.client.get(
             "/expenses/export/csv?start_date=2026-04-01&end_date=2026-04-30"
         )
         self.assertEqual(csv_response.status_code, 200)
         self.assertIn("text/csv", csv_response.headers["content-type"])
+        self.assertIn(
+            'attachment; filename="expenses_2026-04-01_to_2026-04-30.csv"',
+            csv_response.headers["content-disposition"],
+        )
+        self.assertTrue(csv_response.text.startswith("\ufeffid,amount,note,date,category"))
+        self.assertIn("10.10,午餐,2026-04-10,餐饮", csv_response.text)
         self.assertIn("午餐", csv_response.text)
+
+    def test_monthly_summary_empty_month_returns_zero_state(self) -> None:
+        monthly = self.client.get("/expenses/summary/monthly?month=2026-04")
+
+        self.assertEqual(monthly.status_code, 200)
+        self.assertEqual(
+            monthly.json(),
+            {
+                "month": "2026-04",
+                "total_amount": 0.0,
+                "count": 0,
+                "average_daily_amount": 0.0,
+                "items": [],
+            },
+        )
 
     def test_date_ranges_must_be_ordered(self) -> None:
         list_response = self.client.get(
@@ -157,6 +186,57 @@ class SaveMoneyApiTest(unittest.TestCase):
 
         excessive_limit = self.client.get("/expenses?limit=201")
         self.assertEqual(excessive_limit.status_code, 422)
+
+    def test_expense_list_limit_offset_returns_requested_page(self) -> None:
+        for amount, note, expense_date in [
+            (1, "第一笔", "2026-04-01"),
+            (2, "第二笔", "2026-04-02"),
+            (3, "第三笔", "2026-04-03"),
+        ]:
+            response = self.client.post(
+                "/expenses",
+                json={
+                    "amount": amount,
+                    "note": note,
+                    "date": expense_date,
+                    "category": "其他",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+
+        page = self.client.get("/expenses?limit=1&offset=1")
+
+        self.assertEqual(page.status_code, 200)
+        data = page.json()
+        self.assertEqual(data["total"], 3)
+        self.assertEqual(data["limit"], 1)
+        self.assertEqual(data["offset"], 1)
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["items"][0]["note"], "第二笔")
+
+    def test_csv_import_creates_expenses_and_reports_bad_rows(self) -> None:
+        csv_content = (
+            "\ufeffamount,note,date,category\n"
+            "12.50,午餐,2026-04-12,餐饮\n"
+            "0,无效金额,2026-04-12,餐饮\n"
+            "3.25,地铁,2026-04-13,交通\n"
+        ).encode("utf-8")
+
+        response = self.client.post(
+            "/backup/import-csv",
+            files={"file": ("expenses.csv", csv_content, "text/csv")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["imported"], 2)
+        self.assertEqual(len(data["errors"]), 1)
+        self.assertIn("第2行", data["errors"][0])
+        self.assertTrue(Path(data["backup_path"]).exists())
+
+        imported = self.client.get("/expenses?limit=10")
+        self.assertEqual(imported.status_code, 200)
+        self.assertEqual(imported.json()["total"], 2)
 
     def test_backup_uses_configured_sqlite_database_path(self) -> None:
         from app.utils.backup_utils import get_db_path
@@ -207,7 +287,6 @@ class SaveMoneyApiTest(unittest.TestCase):
             shutil.copy2(original_backup, self.db_path)
 
     def test_saving_plan_money_fields_are_stored_as_cents(self) -> None:
-        from datetime import date, timedelta
         from app.database import SessionLocal
         from app.models import SavingPlan
 
@@ -244,6 +323,30 @@ class SaveMoneyApiTest(unittest.TestCase):
         finally:
             db.close()
 
+    def test_current_saving_plan_returns_calculated_progress(self) -> None:
+        deadline = date.today() + timedelta(days=10)
+        create_response = self.client.post(
+            "/plans/generate",
+            json={
+                "monthly_income": 5000,
+                "fixed_expenses": 1000,
+                "target_amount": 1000,
+                "deadline": deadline.isoformat(),
+                "identity": "worker",
+                "minimum_living_cost": 1000,
+            },
+        )
+        self.assertEqual(create_response.status_code, 200)
+
+        current = self.client.get("/plans/current")
+
+        self.assertEqual(current.status_code, 200)
+        data = current.json()
+        self.assertEqual(data["remaining_days"], 10)
+        self.assertEqual(data["daily_saving"], 100)
+        self.assertEqual(data["daily_available"], 100)
+        self.assertEqual(data["plan"]["target_amount"], 1000)
+
     def test_error_response_uses_unified_shape(self) -> None:
         response = self.client.get("/expenses/summary/monthly?month=2026-13")
 
@@ -251,6 +354,40 @@ class SaveMoneyApiTest(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["error"]["code"], "HTTP_422")
         self.assertEqual(data["error"]["message"], "month 格式错误，应为 YYYY-MM")
+
+    def test_404_422_and_500_errors_use_unified_shape(self) -> None:
+        not_found = self.client.delete("/expenses/999")
+        self.assertEqual(not_found.status_code, 404)
+        self.assertEqual(not_found.json()["error"]["code"], "HTTP_404")
+        self.assertEqual(not_found.json()["error"]["message"], "消费记录不存在")
+
+        validation = self.client.post(
+            "/expenses",
+            json={"amount": 0, "note": "", "date": "bad-date"},
+        )
+        self.assertEqual(validation.status_code, 422)
+        self.assertEqual(validation.json()["error"]["code"], "VALIDATION_ERROR")
+        self.assertEqual(validation.json()["error"]["message"], "请求参数校验失败")
+        self.assertIsInstance(validation.json()["error"]["details"], list)
+
+        from app.main import app
+
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch(
+            "app.services.expense_service.list_expenses",
+            side_effect=RuntimeError("database unavailable"),
+        ):
+            server_error = client.get("/expenses")
+
+        self.assertEqual(server_error.status_code, 500)
+        self.assertEqual(
+            server_error.json()["error"],
+            {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "服务器内部错误",
+                "details": None,
+            },
+        )
 
     def test_ai_json_parser_accepts_fenced_json(self) -> None:
         from app.utils.ai_json import parse_ai_json_object
@@ -311,6 +448,38 @@ class SaveMoneyApiTest(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["category"], "交通")
         self.assertIn("本地规则", data["reason"])
+
+    def test_ai_category_invalid_json_falls_back_to_local_rule(self) -> None:
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}), patch(
+            "app.services.ai_service.call_deepseek",
+            return_value="不是 JSON",
+        ):
+            response = self.client.post(
+                "/ai/suggest-category",
+                json={"amount": 6, "note": "地铁"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["category"], "交通")
+        self.assertIn("本地规则", data["reason"])
+
+    def test_token_auth_can_require_bearer_token(self) -> None:
+        with patch.dict(os.environ, {"SAVEMONEY_ACCESS_TOKEN": "secret"}):
+            unauthorized = self.client.get("/expenses")
+            wrong = self.client.get(
+                "/expenses",
+                headers={"Authorization": "Bearer wrong"},
+            )
+            authorized = self.client.get(
+                "/expenses",
+                headers={"Authorization": "Bearer secret"},
+            )
+
+        self.assertEqual(unauthorized.status_code, 401)
+        self.assertEqual(unauthorized.json()["error"]["code"], "HTTP_401")
+        self.assertEqual(wrong.status_code, 401)
+        self.assertEqual(authorized.status_code, 200)
 
     def test_ai_monthly_advice_without_api_key_returns_friendly_message(self) -> None:
         create_response = self.client.post(

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { usePreset } from "../hooks/usePreset";
 import { apiClient, ApiError } from "../lib/api-client";
+import { getPlanResultRows, validatePlanForm } from "../lib/ui-logic";
 import { AdjustResult, PlanResult, SavingPlanCurrentResponse } from "../types";
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -35,21 +36,16 @@ export function PlanForm() {
     const fixed = Number(preset.fixedExpenses);
     const target = Number(targetAmount);
     const minimum = Number(preset.minimumLivingCost);
+    const validationError = validatePlanForm({
+      monthlyIncome: preset.monthlyIncome,
+      fixedExpenses: preset.fixedExpenses,
+      minimumLivingCost: preset.minimumLivingCost,
+      targetAmount,
+      deadline,
+    });
 
-    if (!income || income <= 0) {
-      setError("月收入必须大于 0");
-      return;
-    }
-    if (fixed < 0 || minimum < 0) {
-      setError("固定支出和最低生活费不能小于 0");
-      return;
-    }
-    if (!target || target <= 0) {
-      setError("攒钱目标必须大于 0");
-      return;
-    }
-    if (!deadline) {
-      setError("请选择截止日期");
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -232,13 +228,11 @@ export function PlanForm() {
 
       {result && (
         <div className="mt-4 grid gap-3 rounded-lg border border-gray-800 bg-gray-950 p-4 text-sm sm:grid-cols-2">
-          <p>剩余天数：{result.remaining_days}</p>
-          <p>每日需存：{result.daily_saving} 元</p>
-          <p>每月可支配：{result.monthly_available} 元</p>
-          <p>日均可支配：{result.daily_available} 元</p>
-          <p>可行性评分：{result.feasibility_score} / 100</p>
-          <p>状态：{result.status}</p>
-          <p className="sm:col-span-2">说明：{result.message}</p>
+          {getPlanResultRows(result).map((line) => (
+            <p key={line} className={line.startsWith("说明：") ? "sm:col-span-2" : undefined}>
+              {line}
+            </p>
+          ))}
         </div>
       )}
 

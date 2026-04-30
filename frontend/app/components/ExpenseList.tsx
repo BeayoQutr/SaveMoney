@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiClient, ApiError } from "../lib/api-client";
+import { buildExpenseListFilters, getExpensePaginationState } from "../lib/ui-logic";
 import { ExpenseItem } from "../types";
 
 const categories = ["餐饮", "交通", "学习", "娱乐", "购物", "医疗", "生活", "其他"];
@@ -47,12 +48,14 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
     setError("");
     try {
       const result = await apiClient.listExpenses({
-        startDate: filterStartDate || undefined,
-        endDate: filterEndDate || undefined,
-        category: filterCategory || undefined,
-        keyword: filterKeyword || undefined,
-        limit: pageLimit,
-        offset: pageOffset,
+        ...buildExpenseListFilters({
+          startDate: filterStartDate,
+          endDate: filterEndDate,
+          category: filterCategory,
+          keyword: filterKeyword,
+          limit: pageLimit,
+          offset: pageOffset,
+        }),
       });
       setItems(result.items ?? []);
       setTotal(result.total ?? 0);
@@ -145,8 +148,11 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
     setPageOffset(0);
   }
 
-  const totalPages = Math.ceil(total / pageLimit);
-  const currentPage = Math.floor(pageOffset / pageLimit) + 1;
+  const pagination = getExpensePaginationState({
+    total,
+    limit: pageLimit,
+    offset: pageOffset,
+  });
 
   return (
     <section className="min-w-0 rounded-lg border border-gray-800 p-4 sm:p-5">
@@ -353,12 +359,12 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
       {total > 0 && (
         <div className="mt-4 flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950 px-4 py-3 text-sm">
           <span className="text-gray-400">
-            共 {total} 条记录，第 {currentPage} / {totalPages} 页
+            共 {total} 条记录，第 {pagination.currentPage} / {pagination.totalPages} 页
           </span>
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={pageOffset === 0}
+              disabled={!pagination.canGoPrevious}
               onClick={() => {
                 setPageOffset(Math.max(0, pageOffset - pageLimit));
               }}
@@ -368,7 +374,7 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
             </button>
             <button
               type="button"
-              disabled={pageOffset + pageLimit >= total}
+              disabled={!pagination.canGoNext}
               onClick={() => {
                 setPageOffset(pageOffset + pageLimit);
               }}

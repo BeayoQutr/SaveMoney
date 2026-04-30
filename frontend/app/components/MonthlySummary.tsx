@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiClient, ApiError } from "../lib/api-client";
+import { generateMonthlyAdvice } from "../lib/ui-logic";
 import { CategoryItem, DailySummary, MonthlySummary as MonthlySummaryType } from "../types";
 
 function getTodayLocalDateString() {
@@ -32,40 +33,6 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error.message || fallback;
   }
   return fallback;
-}
-
-function generateMonthlyAdvice(data: MonthlySummaryType): string[] {
-  const advice: string[] = [];
-  if (data.count === 0) {
-    return ["本月暂无消费记录。先记录几笔日常开销，系统会根据数据分析消费结构。"];
-  }
-
-  const sortedByAmount = [...data.items].sort((a, b) => b.total_amount - a.total_amount);
-  const top = sortedByAmount[0];
-  if (top) {
-    advice.push(`本月消费主要集中在「${top.category}」，可以先检查这类支出是否符合预期。`);
-  }
-
-  for (const item of data.items) {
-    const pct = data.total_amount > 0 ? (item.total_amount / data.total_amount) * 100 : 0;
-    if (item.category === "餐饮" && pct > 50) {
-      advice.push("餐饮占比较高，可以关注外卖、零食和聚餐频次。");
-    }
-    if (item.category === "交通" && pct > 20) {
-      advice.push("交通支出占比较高，可以比较公交、地铁、步行或骑行等替代方式。");
-    }
-    if (item.category === "购物" && pct > 30) {
-      advice.push("购物支出占比较高，购买前可以先判断是否为必要消费。");
-    }
-  }
-
-  if (data.average_daily_amount > 100) {
-    advice.push(`本月日均消费为 ${data.average_daily_amount} 元，可以设置每日预算上限。`);
-  }
-  if (advice.length === 0) {
-    advice.push("本月消费结构整体较均衡，可以继续保持记录习惯。");
-  }
-  return advice.slice(0, 4);
 }
 
 type MonthlySummaryProps = {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { apiClient, ApiError } from "../lib/api-client";
+import { validateExpenseForm } from "../lib/ui-logic";
 
 const quickNotes = ["早餐", "午餐", "晚餐", "公交", "地铁", "学习", "买药", "购物"];
 const categories = ["餐饮", "交通", "学习", "娱乐", "购物", "医疗", "生活", "其他"];
@@ -109,16 +110,9 @@ export function ExpenseForm({ onChanged }: ExpenseFormProps) {
     setError("");
     setSuccess("");
     const amountNum = Number(amount);
-    if (!amount || Number.isNaN(amountNum) || amountNum <= 0) {
-      setError("金额非法，请输入大于 0 的数字");
-      return;
-    }
-    if (!note.trim()) {
-      setError("备注不能为空，请填写消费备注");
-      return;
-    }
-    if (!date) {
-      setError("请选择消费日期");
+    const validationError = validateExpenseForm({ amount, note, date });
+    if (validationError) {
+      setError(validationError);
       return;
     }
 

@@ -2,11 +2,8 @@
 
 import { useRef, useState } from "react";
 
-import { apiClient, ApiError } from "../lib/api-client";
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof ApiError ? error.message || fallback : fallback;
-}
+import { apiClient } from "../lib/api-client";
+import { getUploadFailureMessage } from "../lib/ui-logic";
 
 export function BackupPanel() {
   const [status, setStatus] = useState("");
@@ -23,7 +20,7 @@ export function BackupPanel() {
       await apiClient.downloadDbBackup();
       setStatus("数据库下载已开始，请查看浏览器下载列表");
     } catch (err) {
-      setError(getErrorMessage(err, "下载失败"));
+      setError(getUploadFailureMessage(err, "下载失败"));
       setStatus("");
     } finally {
       setLoading(false);
@@ -45,7 +42,7 @@ export function BackupPanel() {
       const result = await apiClient.restoreDb(file);
       setStatus(`${result.message}（已自动备份旧库）`);
     } catch (err) {
-      setError(getErrorMessage(err, "数据库恢复失败"));
+      setError(getUploadFailureMessage(err, "数据库恢复失败"));
       setStatus("");
     } finally {
       setLoading(false);
@@ -61,7 +58,7 @@ export function BackupPanel() {
       const result = await apiClient.importCsv(file);
       setStatus(`${result.message}（已自动备份旧库）`);
     } catch (err) {
-      setError(getErrorMessage(err, "CSV 导入失败"));
+      setError(getUploadFailureMessage(err, "CSV 导入失败"));
       setStatus("");
     } finally {
       setLoading(false);
