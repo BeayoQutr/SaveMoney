@@ -81,6 +81,9 @@ SaveMoney/
 │  │  ├─ lib/              # API 客户端
 │  │  ├─ page.tsx          # 页面组合入口
 │  │  └─ types.ts          # TypeScript 类型
+│  ├─ e2e/                 # Playwright 端到端测试
+│  ├─ tests/               # 前端单元测试
+│  ├─ playwright.config.ts # Playwright 测试配置
 │  └─ package.json
 ├─ docs/images/            # 项目截图
 └─ .github/workflows/ci.yml
@@ -221,7 +224,12 @@ cd frontend
 npm run lint
 npm test
 npm run build
+
+# 可选：端到端测试
+npm run e2e
 ```
+
+前端应用构建的 TypeScript 范围只覆盖应用代码；`tests/`、`e2e/` 和 `playwright.config.ts` 由独立测试命令检查，避免 `next build` 在 CI 构建阶段误检查 Playwright 配置。
 
 ## 环境变量说明
 
