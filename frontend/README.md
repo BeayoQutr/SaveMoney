@@ -4,11 +4,13 @@
 
 ## 本地运行
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
+
+项目已默认使用 webpack 启动 Next 开发服务器，避免 Turbopack 在部分 Windows 电脑上导致高 CPU/内存占用。
 
 默认访问地址：
 

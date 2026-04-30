@@ -33,9 +33,11 @@ export function BackendStatus({ onChecked }: BackendStatusProps) {
       setOnline(false);
       setMessage("后端未响应，请先启动 FastAPI 服务");
     } finally {
-      onChecked?.();
+      if (!signal?.aborted) {
+        onChecked?.();
+      }
     }
-  }, []);
+  }, [onChecked]);
 
   useEffect(() => {
     abortRef.current?.abort();
