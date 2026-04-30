@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiClient, ApiError } from "../lib/api-client";
 import { generateMonthlyAdvice } from "../lib/ui-logic";
@@ -59,14 +59,17 @@ export function MonthlySummary({ refreshKey }: MonthlySummaryProps) {
   const [categoryError, setCategoryError] = useState("");
   const [categoryLoading, setCategoryLoading] = useState(false);
 
-  const fetchMonthlySummary = useCallback(async () => {
+  const abortRef = useRef<AbortController | null>(null);
+
+  const fetchMonthlySummary = useCallback(async (signal?: AbortSignal) => {
     setMonthlyLoading(true);
     setMonthlyError("");
     try {
-      const data = await apiClient.monthlySummary(getCurrentMonthKey());
+      const data = await apiClient.monthlySummary(getCurrentMonthKey(), signal);
       setMonthly(data);
       setMonthlyAdvice(generateMonthlyAdvice(data));
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setMonthlyError(getErrorMessage(err, "本月总览查询失败，请确认后端已启动"));
       setMonthlyAdvice([]);
     } finally {
@@ -75,7 +78,13 @@ export function MonthlySummary({ refreshKey }: MonthlySummaryProps) {
   }, []);
 
   useEffect(() => {
-    void Promise.resolve().then(fetchMonthlySummary);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void Promise.resolve().then(() => fetchMonthlySummary(controller.signal));
+    return () => {
+      controller.abort();
+    };
   }, [fetchMonthlySummary, refreshKey]);
 
   async function fetchDailySummary() {
@@ -142,7 +151,12 @@ export function MonthlySummary({ refreshKey }: MonthlySummaryProps) {
         <h2 className="text-xl font-bold">本月总览与统计</h2>
         <button
           type="button"
-          onClick={() => void fetchMonthlySummary()}
+          onClick={() => {
+            abortRef.current?.abort();
+            const controller = new AbortController();
+            abortRef.current = controller;
+            void fetchMonthlySummary(controller.signal);
+          }}
           className="min-h-11 rounded-lg border border-gray-600 px-4 font-medium"
         >
           {monthlyLoading ? "刷新中..." : "刷新总览"}

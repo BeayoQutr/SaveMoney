@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiClient, ApiError } from "../lib/api-client";
 import { buildExpenseListFilters, getExpensePaginationState } from "../lib/ui-logic";
@@ -43,23 +43,29 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
     filterStartDate || filterEndDate || filterCategory || filterKeyword
   );
 
-  const fetchExpenses = useCallback(async () => {
+  const abortRef = useRef<AbortController | null>(null);
+
+  const fetchExpenses = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError("");
     try {
-      const result = await apiClient.listExpenses({
-        ...buildExpenseListFilters({
-          startDate: filterStartDate,
-          endDate: filterEndDate,
-          category: filterCategory,
-          keyword: filterKeyword,
-          limit: pageLimit,
-          offset: pageOffset,
-        }),
-      });
+      const result = await apiClient.listExpenses(
+        {
+          ...buildExpenseListFilters({
+            startDate: filterStartDate,
+            endDate: filterEndDate,
+            category: filterCategory,
+            keyword: filterKeyword,
+            limit: pageLimit,
+            offset: pageOffset,
+          }),
+        },
+        signal
+      );
       setItems(result.items ?? []);
       setTotal(result.total ?? 0);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(getErrorMessage(err, "消费记录加载失败，请确认后端已启动"));
     } finally {
       setLoading(false);
@@ -67,7 +73,13 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
   }, [filterStartDate, filterEndDate, filterCategory, filterKeyword, pageOffset]);
 
   useEffect(() => {
-    void Promise.resolve().then(fetchExpenses);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void Promise.resolve().then(() => fetchExpenses(controller.signal));
+    return () => {
+      controller.abort();
+    };
   }, [fetchExpenses, refreshKey]);
 
   function startEdit(item: ExpenseItem) {
@@ -137,7 +149,10 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
 
   function applyFilters() {
     setPageOffset(0);
-    void fetchExpenses();
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void fetchExpenses(controller.signal);
   }
 
   function clearFilters() {
@@ -160,7 +175,12 @@ export function ExpenseList({ refreshKey, onChanged }: ExpenseListProps) {
         <h2 className="text-xl font-bold">消费记录</h2>
         <button
           type="button"
-          onClick={() => void fetchExpenses()}
+          onClick={() => {
+            abortRef.current?.abort();
+            const controller = new AbortController();
+            abortRef.current = controller;
+            void fetchExpenses(controller.signal);
+          }}
           className="min-h-11 rounded-lg border border-gray-600 px-4 font-medium"
         >
           {loading ? "刷新中..." : "刷新列表"}

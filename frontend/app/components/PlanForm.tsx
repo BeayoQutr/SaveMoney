@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { usePreset } from "../hooks/usePreset";
 import { apiClient, ApiError } from "../lib/api-client";
@@ -25,12 +25,20 @@ export function PlanForm({ refreshKey }: PlanFormProps) {
   const [savedAmount, setSavedAmount] = useState("");
   const [currentPlan, setCurrentPlan] = useState<SavingPlanCurrentResponse | null>(null);
 
-  const fetchCurrentPlan = useCallback(async () => {
-    setCurrentPlan(await apiClient.getCurrentPlan());
+  const abortRef = useRef<AbortController | null>(null);
+
+  const fetchCurrentPlan = useCallback(async (signal?: AbortSignal) => {
+    setCurrentPlan(await apiClient.getCurrentPlan(signal));
   }, []);
 
   useEffect(() => {
-    void Promise.resolve().then(fetchCurrentPlan).catch(() => {});
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void Promise.resolve().then(() => fetchCurrentPlan(controller.signal)).catch(() => {});
+    return () => {
+      controller.abort();
+    };
   }, [fetchCurrentPlan, refreshKey]);
   const [actualExpenseToday, setActualExpenseToday] = useState("");
   const [adjustResult, setAdjustResult] = useState<AdjustResult | null>(null);
@@ -68,7 +76,7 @@ export function PlanForm({ refreshKey }: PlanFormProps) {
         identity: preset.identity,
       });
       setResult(data);
-      await fetchCurrentPlan();
+      await fetchCurrentPlan(abortRef.current?.signal);
     } catch (err) {
       setError(getErrorMessage(err, "生成失败，请确认后端已启动"));
     } finally {
